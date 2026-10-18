@@ -1,7 +1,7 @@
 package com.hardwarehub.order_service.repository;
 
-import com.hardwarehub.order_service.entity.enums.OrderStatus;
 import com.hardwarehub.order_service.entity.OrderEntity;
+import com.hardwarehub.order_service.entity.enums.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,7 +12,17 @@ import java.util.Optional;
 @Repository
 public interface OrderRepository extends JpaRepository<OrderEntity, Integer>
 {
-    Page<OrderEntity> findAllByUserUsernameAndStatusNotOrderByCreatedAtDesc(String username, OrderStatus status, Pageable pageable);
+    Optional<OrderEntity> findByUserIdAndStatus(int userId, OrderStatus status);
 
-    Optional<OrderEntity> findByUserUsernameAndStatus(String username, OrderStatus status);
+    Page<OrderEntity> findAllByUserIdAndStatusNotOrderByCreatedAtDesc(
+            int userId,
+            OrderStatus status,
+            Pageable pageable
+    );
+
+    Optional<OrderEntity> findByIdAndUserId(int id, int userId);
+
+    Page<OrderEntity> findAllByUserIdOrderByCreatedAtDesc(int userId, Pageable pageable);
+
+    Page<OrderEntity> findAllByUserIdAndStatusOrderByCreatedAtDesc(int userId, OrderStatus status, Pageable pageable);
 }
