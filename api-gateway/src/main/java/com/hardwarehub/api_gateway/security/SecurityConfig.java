@@ -1,30 +1,26 @@
 package com.hardwarehub.api_gateway.security;
 
-import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
+import com.hardwarehub.api_gateway.jwt.AccessTokenJwtDecoder;
+import com.hardwarehub.api_gateway.jwt.JwtPropagationFilterSupplier;
+import jakarta.servlet.http.Cookie;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 @Configuration
 public class SecurityConfig
 {
-    @Value("${jwt.secret-key}")
-    private String secretKey;
-
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            CookieBearerTokenResolver bearerTokenResolver,
-            JwtDecoder jwtDecoder
-    )
+            BearerTokenResolver bearerTokenResolver,
+            AccessTokenJwtDecoder jwtDecoder
+    ) throws Exception
     {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -33,17 +29,34 @@ public class SecurityConfig
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .bearerTokenResolver(bearerTokenResolver)
-                        .jwt(jwt -> jwt.decoder(jwtDecoder))
+
+                                // Extract the token from the cookie
+                                .bearerTokenResolver(bearerTokenResolver)
+
+                                // Validate the signature and decode the JWT
+                                .jwt(jwt -> jwt.decoder(jwtDecoder))
                 )
                 .build();
     }
 
     @Bean
-    public JwtDecoder jwtDecoder()
+    public BearerTokenResolver bearerTokenResolver()
     {
-        SecretKey key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
+        return request ->
+        {
+            if (request.getCookies() == null) return null;
 
-        return NimbusJwtDecoder.withSecretKey(key).build();
+            return Arrays.stream(request.getCookies())
+                    .filter(c -> c.getName().equals("access-token"))
+                    .findFirst()
+                    .map(Cookie::getValue)
+                    .orElse(null);
+        };
+    }
+
+    @Bean
+    public JwtPropagationFilterSupplier jwtPropagationFilterSupplier()
+    {
+        return new JwtPropagationFilterSupplier();
     }
 }
