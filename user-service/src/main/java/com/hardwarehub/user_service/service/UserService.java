@@ -1,9 +1,8 @@
 package com.hardwarehub.user_service.service;
 
+import com.hardwarehub.user_service.dto.*;
 import com.hardwarehub.user_service.mapper.UserMapper;
 import com.hardwarehub.user_service.repository.UserRepository;
-import com.hardwarehub.user_service.dto.PasswordRequestDTO;
-import com.hardwarehub.user_service.dto.UserResponseDTO;
 import com.hardwarehub.user_service.entity.UserEntity;
 import com.hardwarehub.user_service.enums.Role;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +59,57 @@ public class UserService
         return userMapper.entityToDTO(findByEmailOrThrow(email));
     }
 
+    public UserResponseDTO updateMe(UserUpdateRequestDTO requestDTO)
+    {
+        UserEntity user = findCurrentUserOrThrow();
+
+        // Update the request values that are not null.
+        updateUser(user, requestDTO);
+
+        return userMapper.entityToDTO(userRepository.save(user));
+    }
+
+    public UserResponseDTO updateById(int id, UserUpdateRequestDTO requestDTO)
+    {
+        UserEntity user = findByIdOrThrow(id);
+
+        validateIsNotAdmin(user);
+
+        updateUser(user, requestDTO);
+
+        return userMapper.entityToDTO(userRepository.save(user));
+    }
+
+    public UserResponseDTO updateRoleById(int id, RoleRequestDTO requestDTO)
+    {
+        UserEntity user = findByIdOrThrow(id);
+
+        validateIsNotAdmin(user);
+
+        user.setRole(requestDTO.role());
+
+        return userMapper.entityToDTO(userRepository.save(user));
+    }
+
+    public void changePassword(PasswordUpdateRequestDTO requestDTO)
+    {
+        UserEntity user = findCurrentUserOrThrow();
+
+        if (!passwordEncoder.matches(requestDTO.currentPassword(), user.getPassword()))
+        {
+            throw new RuntimeException("Your current password does not match.");
+        }
+
+        if (passwordEncoder.matches(requestDTO.newPassword(), user.getPassword()))
+        {
+            throw new RuntimeException("Your new password must be different from your current password.");
+        }
+
+        user.setPassword(passwordEncoder.encode(requestDTO.newPassword()));
+
+        userRepository.save(user);
+    }
+
     public void deleteMe(PasswordRequestDTO requestDTO)
     {
         UserEntity user = findCurrentUserOrThrow();
@@ -69,7 +119,7 @@ public class UserService
             throw new RuntimeException("Invalid password.");
         }
 
-        userRepository.delete(user);
+        deleteUser(user);
     }
 
     public void deleteById(int id)
@@ -81,13 +131,24 @@ public class UserService
         deleteUser(user);
     }
 
-    public void deleteByEmail(String email)
+    private void updateUser(UserEntity user, UserUpdateRequestDTO requestDTO)
     {
-        UserEntity user = findByEmailOrThrow(email);
-
-        validateIsNotAdmin(user);
-
-        deleteUser(user);
+        if (requestDTO.email() != null && !userRepository.existsByEmail(requestDTO.email()))
+        {
+            user.setEmail(requestDTO.email());
+        }
+        if (requestDTO.username() != null && !userRepository.existsByUsername(requestDTO.username()))
+        {
+            user.setUsername(requestDTO.username());
+        }
+        if (requestDTO.firstName() != null)
+        {
+            user.setFirstName(requestDTO.firstName());
+        }
+        if (requestDTO.lastName() != null)
+        {
+            user.setLastName(requestDTO.lastName());
+        }
     }
 
     private UserEntity findCurrentUserOrThrow()
@@ -113,7 +174,7 @@ public class UserService
 
     private void deleteUser(UserEntity user)
     {
-        // TODO: Add logs and more
+        // TODO: Add logging.
         userRepository.delete(user);
     }
 
