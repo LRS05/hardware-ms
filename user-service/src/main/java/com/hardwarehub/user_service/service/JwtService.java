@@ -119,7 +119,8 @@ public class JwtService
                 .id(UUID.randomUUID().toString())
                 .subject(user.getUsername())
                 .claims(Map.of(
-                        "role", "ROLE_" + user.getRole(),
+                        "userId", user.getId(),
+                        "role", user.getRole(),
                         "type", type
                 ))
                 .issuedAt(new Date())
