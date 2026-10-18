@@ -7,27 +7,29 @@ spring:
 
   cloud:
     gateway:
-      routes:
-        - id: user-service
-          uri: lb://user-service
-          predicates:
-            - Path=/api/v1/users/**, /api/v1/auth/**, /api/v1/admin/**
-          filters:
-            - JwtPropagation
+      server:
+        webmvc:
+          routes:
+            - id: user-service
+              uri: lb://user-service
+              predicates:
+                - Path=/api/v1/users/**,/api/v1/auth/**,/api/v1/admin/**
+              filters:
+                - JwtPropagation
 
-        - id: product-service
-          uri: lb://product-service
-          predicates:
-            - Path=/api/v1/products/**
-          filters:
-            - JwtPropagation
+            - id: product-service
+              uri: lb://product-service
+              predicates:
+                - Path=/api/v1/products/**
+              filters:
+                - JwtPropagation
 
-        - id: order-service
-          uri: lb://order-service
-          predicates:
-            - Path=/api/v1/orders/**
-          filters:
-            - JwtPropagation
+            - id: order-service
+              uri: lb://order-service
+              predicates:
+                - Path=/api/v1/orders/**
+              filters:
+                - JwtPropagation
 
 eureka:
   client:
@@ -36,3 +38,7 @@ eureka:
 
 jwt:
   secret-key: ${JWT_SECRET_KEY}
+
+logging:
+  level:
+    root: INFO
