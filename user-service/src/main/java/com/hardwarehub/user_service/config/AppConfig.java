@@ -1,9 +1,8 @@
 package com.hardwarehub.user_service.config;
 
 import com.hardwarehub.user_service.repository.UserRepository;
-import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -14,11 +13,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
+import org.springframework.web.client.RestClient;
 
 @Configuration
 @RequiredArgsConstructor
@@ -54,10 +49,9 @@ public class AppConfig
     }
 
     @Bean
-    public JwtDecoder jwtDecoder(@Value("${jwt.secret-key}") String secretKey)
+    @LoadBalanced
+    public RestClient.Builder restClientBuilder()
     {
-        SecretKey key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
-
-        return NimbusJwtDecoder.withSecretKey(key).build();
+        return RestClient.builder();
     }
 }
