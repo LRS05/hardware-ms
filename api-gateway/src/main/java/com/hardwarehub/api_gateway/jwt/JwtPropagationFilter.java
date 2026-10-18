@@ -1,4 +1,4 @@
-package com.hardwarehub.api_gateway.security;
+package com.hardwarehub.api_gateway.jwt;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -9,12 +9,10 @@ import org.springframework.web.servlet.function.ServerResponse;
 
 public class JwtPropagationFilter
 {
-    private JwtPropagationFilter() {}
-
     public static HandlerFilterFunction<ServerResponse, ServerResponse> jwtPropagation()
     {
-        return (request, next) -> {
-
+        return (request, next) ->
+        {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
             if (authentication instanceof JwtAuthenticationToken jwt
