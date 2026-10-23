@@ -2,6 +2,8 @@ package com.hardwarehub.user_service.service;
 
 import com.hardwarehub.user_service.entity.UserEntity;
 import com.hardwarehub.user_service.enums.TokenType;
+import com.hardwarehub.user_service.exception.CookieNotFoundException;
+import com.hardwarehub.user_service.exception.InvalidJwtException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -60,7 +62,7 @@ public class JwtService
 
     public String getTokenFromCookies(TokenType tokenType, Cookie[] cookies)
     {
-        if (cookies == null) throw new RuntimeException("Cookies are empty.");
+        if (cookies == null) throw new CookieNotFoundException("Cookies are empty.");
 
         String cookieName = tokenType.name().toLowerCase() + "-token";
 
@@ -68,7 +70,7 @@ public class JwtService
                 .filter(c -> c.getName().equals(cookieName))
                 .findFirst()
                 .map(Cookie::getValue)
-                .orElseThrow(() -> new RuntimeException(cookieName + " cookie not found."));
+                .orElseThrow(() -> new CookieNotFoundException(cookieName + " cookie not found."));
     }
 
     public String getSubject(String token)
@@ -98,7 +100,7 @@ public class JwtService
         }
         catch (JwtException e)
         {
-            throw new RuntimeException("Invalid or expired JWT.");
+            throw new InvalidJwtException("Invalid or expired JWT.");
         }
     }
 

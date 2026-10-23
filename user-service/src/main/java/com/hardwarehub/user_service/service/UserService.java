@@ -1,6 +1,10 @@
 package com.hardwarehub.user_service.service;
 
 import com.hardwarehub.user_service.dto.*;
+import com.hardwarehub.user_service.exception.EmailAlreadyExistsException;
+import com.hardwarehub.user_service.exception.InvalidCurrentPasswordException;
+import com.hardwarehub.user_service.exception.PasswordReuseNotAllowedException;
+import com.hardwarehub.user_service.exception.UsernameAlreadyExistsException;
 import com.hardwarehub.user_service.mapper.UserMapper;
 import com.hardwarehub.user_service.repository.UserRepository;
 import com.hardwarehub.user_service.entity.UserEntity;
@@ -32,7 +36,6 @@ public class UserService
         Page<UserEntity> users = userRepository.findAll(pageable);
 
         return users.map(userMapper::entityToDTO);
-
     }
 
     public Page<UserResponseDTO> getAllByUsernameLike(String username, Pageable pageable)
@@ -97,12 +100,12 @@ public class UserService
 
         if (!passwordEncoder.matches(requestDTO.currentPassword(), user.getPassword()))
         {
-            throw new RuntimeException("Your current password does not match.");
+            throw new InvalidCurrentPasswordException("Your current password does not match.");
         }
 
         if (passwordEncoder.matches(requestDTO.newPassword(), user.getPassword()))
         {
-            throw new RuntimeException("Your new password must be different from your current password.");
+            throw new PasswordReuseNotAllowedException("Your new password must be different from your current password.");
         }
 
         user.setPassword(passwordEncoder.encode(requestDTO.newPassword()));
@@ -116,7 +119,7 @@ public class UserService
 
         if (!passwordEncoder.matches(requestDTO.password(), user.getPassword()))
         {
-            throw new RuntimeException("Invalid password.");
+            throw new InvalidCurrentPasswordException("Invalid password.");
         }
 
         deleteUser(user);
@@ -133,21 +136,42 @@ public class UserService
 
     private void updateUser(UserEntity user, UserUpdateRequestDTO requestDTO)
     {
-        if (requestDTO.email() != null && !userRepository.existsByEmail(requestDTO.email()))
+        if (requestDTO.email() != null && !requestDTO.email().equals(user.getEmail()))
         {
+            validateEmailIsAvailable(requestDTO.email());
             user.setEmail(requestDTO.email());
         }
-        if (requestDTO.username() != null && !userRepository.existsByUsername(requestDTO.username()))
+
+        if (requestDTO.username() != null && !requestDTO.username().equals(user.getUsername()))
         {
+            validateUsernameIsAvailable(requestDTO.username());
             user.setUsername(requestDTO.username());
         }
+
         if (requestDTO.firstName() != null)
         {
             user.setFirstName(requestDTO.firstName());
         }
+
         if (requestDTO.lastName() != null)
         {
             user.setLastName(requestDTO.lastName());
+        }
+    }
+
+    private void validateEmailIsAvailable(String email)
+    {
+        if (userRepository.existsByEmail(email))
+        {
+            throw new EmailAlreadyExistsException("Email already exists.");
+        }
+    }
+
+    private void validateUsernameIsAvailable(String username)
+    {
+        if (userRepository.existsByUsername(username))
+        {
+            throw new UsernameAlreadyExistsException("Username already exists.");
         }
     }
 

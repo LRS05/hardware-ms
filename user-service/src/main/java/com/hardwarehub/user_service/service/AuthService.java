@@ -1,9 +1,13 @@
 package com.hardwarehub.user_service.service;
 
+import com.hardwarehub.user_service.client.OrderClient;
 import com.hardwarehub.user_service.dto.AuthRequestDTO;
 import com.hardwarehub.user_service.dto.RegisterRequestDTO;
 import com.hardwarehub.user_service.entity.UserEntity;
 import com.hardwarehub.user_service.enums.Role;
+import com.hardwarehub.user_service.exception.EmailAlreadyExistsException;
+import com.hardwarehub.user_service.exception.InvalidJwtException;
+import com.hardwarehub.user_service.exception.UsernameAlreadyExistsException;
 import com.hardwarehub.user_service.repository.UserRepository;
 import com.hardwarehub.user_service.enums.TokenType;
 import jakarta.servlet.http.Cookie;
@@ -11,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -25,17 +30,18 @@ public class AuthService
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
+    private final OrderClient orderClient;
 
     public Map<String, ResponseCookie> register(RegisterRequestDTO requestDTO)
     {
         if (userRepository.existsByUsername(requestDTO.username()))
         {
-            throw new RuntimeException("Username already exists.");
+            throw new UsernameAlreadyExistsException("Username already exists.");
         }
 
         if (userRepository.existsByEmail(requestDTO.email()))
         {
-            throw new RuntimeException("Email already exists.");
+            throw new EmailAlreadyExistsException("Email already exists.");
         }
 
         UserEntity user = userRepository.save(
@@ -49,6 +55,8 @@ public class AuthService
                         .creationDate(LocalDateTime.now())
                         .build()
         );
+
+        orderClient.createByUserId(user.getId());
 
         return jwtCookies(user);
     }
@@ -73,7 +81,7 @@ public class AuthService
 
         if (!jwtService.getType(refreshToken).equals("REFRESH") || !jwtService.isValid(refreshToken, user))
         {
-            throw new RuntimeException("Invalid or expired refresh token.");
+            throw new InvalidJwtException("Invalid or expired refresh token.");
         }
 
         return jwtService.generateAccessTokenCookie(user);
@@ -98,6 +106,6 @@ public class AuthService
     private UserEntity findUserByUsernameOrThrow(String username)
     {
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found."));
+                .orElseThrow(() -> new UsernameNotFoundException("User not found."));
     }
 }
