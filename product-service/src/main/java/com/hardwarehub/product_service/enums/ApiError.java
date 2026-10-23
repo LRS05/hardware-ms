@@ -1,0 +1,13 @@
+package com.hardwarehub.product_service.enums;
+
+public enum ApiError
+{
+    INSUFFICIENT_STOCK,
+    PRODUCT_NAME_ALREADY_EXISTS,
+    PRODUCT_SKU_ALREADY_EXISTS,
+    PRODUCT_NOT_FOUND,
+    PRODUCT_OUT_OF_STOCK,
+
+    METHOD_ARGUMENT_TYPE_MISMATCH,
+    HTTP_MESSAGE_NOT_READABLE
+}

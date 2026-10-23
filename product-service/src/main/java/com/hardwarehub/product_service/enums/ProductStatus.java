@@ -1,4 +1,4 @@
-package com.hardwarehub.product_service.entity.enums;
+package com.hardwarehub.product_service.enums;
 
 public enum ProductStatus
 {

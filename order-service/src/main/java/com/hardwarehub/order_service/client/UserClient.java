@@ -11,7 +11,7 @@ public class UserClient
     public UserClient(RestClient.Builder restClient)
     {
         this.restClient = restClient
-                .baseUrl("http://user-service:8081/api/v1/users")
+                .baseUrl("http://user-service/api/v1/users")
                 .build();
     }
 }

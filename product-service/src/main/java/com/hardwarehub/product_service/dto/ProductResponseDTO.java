@@ -1,7 +1,7 @@
 package com.hardwarehub.product_service.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.hardwarehub.product_service.entity.enums.Category;
+import com.hardwarehub.product_service.enums.Category;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

@@ -18,8 +18,11 @@ public class OrderItemEntity
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
 
-    @Column(name = "product_id", unique = true, nullable = false)
+    @Column(name = "product_id", nullable = false)
     private int productId;
+
+    @Column(name = "product_name", nullable = false)
+    private String productName;
 
     @Column(name = "price", precision = 10, scale = 2, nullable = false)
     private BigDecimal price;

@@ -1,4 +1,4 @@
-package com.hardwarehub.order_service.entity.enums;
+package com.hardwarehub.order_service.enums;
 
 public enum OrderStatus
 {

@@ -1,7 +1,7 @@
 package com.hardwarehub.product_service.entity;
 
-import com.hardwarehub.product_service.entity.enums.Category;
-import com.hardwarehub.product_service.entity.enums.ProductStatus;
+import com.hardwarehub.product_service.enums.Category;
+import com.hardwarehub.product_service.enums.ProductStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -19,7 +19,7 @@ public class ProductEntity
 {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private long id;
+    private int id;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

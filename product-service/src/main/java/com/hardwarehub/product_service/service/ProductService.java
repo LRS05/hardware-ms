@@ -2,11 +2,16 @@ package com.hardwarehub.product_service.service;
 
 import com.hardwarehub.product_service.dto.ProductRequestDTO;
 import com.hardwarehub.product_service.dto.ProductResponseDTO;
+import com.hardwarehub.product_service.dto.ProductUpdateRequestDTO;
 import com.hardwarehub.product_service.dto.StockRequestDTO;
 import com.hardwarehub.product_service.entity.ProductEntity;
-import com.hardwarehub.product_service.entity.enums.Category;
-import com.hardwarehub.product_service.entity.enums.ProductStatus;
+import com.hardwarehub.product_service.enums.Category;
+import com.hardwarehub.product_service.enums.ProductStatus;
+import com.hardwarehub.product_service.exception.InsufficientStockException;
+import com.hardwarehub.product_service.exception.ProductNameAlreadyExistsException;
 import com.hardwarehub.product_service.exception.ProductNotFoundException;
+import com.hardwarehub.product_service.exception.ProductOutOfStockException;
+import com.hardwarehub.product_service.exception.ProductSkuAlreadyExistsException;
 import com.hardwarehub.product_service.mapper.ProductMapper;
 import com.hardwarehub.product_service.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,11 +30,7 @@ public class ProductService
 
     public ProductResponseDTO create(ProductRequestDTO requestDTO)
     {
-        if (productRepository.existsByName(requestDTO.name()) ||
-                productRepository.existsBySku(requestDTO.sku()))
-        {
-            throw new RuntimeException("The product (sku/name) is already in.");
-        }
+        validateNameOrSkuAreAvailable(requestDTO.name(), requestDTO.sku());
 
         ProductEntity product = productRepository.save(
                 ProductEntity.builder()
@@ -52,9 +53,9 @@ public class ProductService
     {
         ProductEntity product = findByIdOrThrow(id);
 
-        if (product.getStatus() != ProductStatus.ACTIVE)
+        if (product.getStatus() != ProductStatus.ACTIVE || product.getStock() == 0)
         {
-            throw new RuntimeException("This product is not ACTIVE.");
+            throw new ProductOutOfStockException("The product is out of stock");
         }
 
         return productMapper.entityToDTO(product);
@@ -67,26 +68,26 @@ public class ProductService
 
     public Page<ProductResponseDTO> getAllByName(String name, Pageable pageable)
     {
-        Page<ProductEntity> products = productRepository.findByNameContainingIgnoreCase(name, pageable);
+        Page<ProductEntity> products = productRepository.findByNameContainingIgnoreCaseAndStatus(name, ProductStatus.ACTIVE, pageable);
 
         return products.map(productMapper::entityToDTO);
     }
 
     public Page<ProductResponseDTO> getAllByCategory(Category category, Pageable pageable)
     {
-        Page<ProductEntity> products = productRepository.findAllByCategory(category, pageable);
+        Page<ProductEntity> products = productRepository.findAllByCategoryAndStatus(category, ProductStatus.ACTIVE, pageable);
 
         return products.map(productMapper::entityToDTO);
     }
 
     public Page<ProductResponseDTO> getRecentlyUpdated(Pageable pageable)
     {
-        Page<ProductEntity> products = productRepository.findTop30ByOrderByUpdatedAtDesc(pageable);
+        Page<ProductEntity> products = productRepository.findTop30ByStatusOrderByUpdatedAtDesc(pageable, ProductStatus.ACTIVE);
 
         return products.map(productMapper::entityToDTO);
     }
 
-    public ProductResponseDTO updateById(int id, ProductRequestDTO requestDTO)
+    public ProductResponseDTO updateById(int id, ProductUpdateRequestDTO requestDTO)
     {
         ProductEntity product = findByIdOrThrow(id);
 
@@ -95,37 +96,28 @@ public class ProductService
         return productMapper.entityToDTO(productRepository.save(product));
     }
 
-    public ProductResponseDTO increaseStockById(int id, StockRequestDTO requestDTO)
+    public void increaseStockById(int id, StockRequestDTO requestDTO)
     {
         ProductEntity product = findByIdOrThrow(id);
 
         product.setStock(product.getStock() + requestDTO.stock());
 
-        if (product.getStatus() != ProductStatus.ACTIVE)
-        {
-            product.setStatus(ProductStatus.ACTIVE);
-        }
+        if (product.getStatus() != ProductStatus.ACTIVE) product.setStatus(ProductStatus.ACTIVE);
 
-        return productMapper.entityToDTO(productRepository.save(product));
+        productRepository.save(product);
     }
 
-    public ProductResponseDTO decreaseStockById(int id, StockRequestDTO requestDTO)
+    public void decreaseStockById(int id, StockRequestDTO requestDTO)
     {
         ProductEntity product = findByIdOrThrow(id);
 
-        if (product.getStatus() == ProductStatus.INACTIVE)
-        {
-            throw new RuntimeException("This product is already out of stock.");
-        }
+        validateStock(product, requestDTO.stock());
 
-        product.setStock(Math.max(product.getStock() - requestDTO.stock(), 0));
+        product.setStock(product.getStock() - requestDTO.stock());
 
-        if (product.getStock() == 0)
-        {
-            product.setStatus(ProductStatus.INACTIVE);
-        }
+        if (product.getStock() == 0) product.setStatus(ProductStatus.INACTIVE);
 
-        return productMapper.entityToDTO(productRepository.save(product));
+        productRepository.save(product);
     }
 
     public void deactivateById(int id)
@@ -151,7 +143,20 @@ public class ProductService
                 .orElseThrow(() -> new ProductNotFoundException("Product not found."));
     }
 
-    private void updateProduct(ProductEntity product, ProductRequestDTO requestDTO)
+    private void validateStock(ProductEntity product, int requiredStock)
+    {
+        if (product.getStatus() == ProductStatus.INACTIVE)
+        {
+            throw new ProductOutOfStockException("This product is out of stock.");
+        }
+
+        if (product.getStock() < requiredStock)
+        {
+            throw new InsufficientStockException("There's not enough stock of this product.");
+        }
+    }
+
+    private void updateProduct(ProductEntity product, ProductUpdateRequestDTO requestDTO)
     {
         if (requestDTO.status() != null)
         {
@@ -186,6 +191,19 @@ public class ProductService
         if (requestDTO.stock() != null)
         {
             product.setStock(requestDTO.stock());
+        }
+    }
+
+    private void validateNameOrSkuAreAvailable(String name, String sku)
+    {
+        if (productRepository.existsByName(name))
+        {
+            throw new ProductNameAlreadyExistsException("Name already exists.");
+        }
+
+        if (productRepository.existsBySku(sku))
+        {
+            throw new ProductSkuAlreadyExistsException("SKU already exists.");
         }
     }
 }
