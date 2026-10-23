@@ -20,3 +20,10 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka
+
+jwt:
+  secret-key: ${JWT_SECRET_KEY}
+  access:
+    expiration: ${JWT_ACCESS_EXPIRATION}
+  refresh:
+    expiration: ${JWT_REFRESH_EXPIRATION}
