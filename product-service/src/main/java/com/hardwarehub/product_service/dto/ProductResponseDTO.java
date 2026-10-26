@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 public record ProductResponseDTO(
 
-        long id,
+        int id,
 
         Category category,
 
