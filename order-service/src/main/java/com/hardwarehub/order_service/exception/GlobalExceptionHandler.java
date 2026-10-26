@@ -22,6 +22,12 @@ public class GlobalExceptionHandler
 {
     private final HttpServletRequest httpServletRequest;
 
+    @ExceptionHandler(InvalidQuantityException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvalidQuantityException(InvalidQuantityException e)
+    {
+        return sendErrorResponse(HttpStatus.BAD_REQUEST, ApiError.INVALID_QUANTITY, e.getMessage());
+    }
+
     @ExceptionHandler(EmptyOrderException.class)
     public ResponseEntity<ErrorResponseDTO> handleEmptyOrderException(EmptyOrderException e)
     {

@@ -3,6 +3,7 @@ package com.hardwarehub.order_service.enums;
 public enum ApiError
 {
     EMPTY_ORDER,
+    INVALID_QUANTITY,
     ITEM_NOT_FOUND,
     ORDER_NOT_FOUND,
     PRODUCT_NOT_FOUND,

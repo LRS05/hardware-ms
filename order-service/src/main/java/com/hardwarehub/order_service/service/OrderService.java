@@ -8,6 +8,7 @@ import com.hardwarehub.order_service.entity.OrderItemEntity;
 import com.hardwarehub.order_service.enums.OrderStatus;
 import com.hardwarehub.order_service.exception.EmptyOrderException;
 import com.hardwarehub.order_service.exception.ItemNotFoundException;
+import com.hardwarehub.order_service.exception.InvalidQuantityException;
 import com.hardwarehub.order_service.exception.OrderNotFoundException;
 import com.hardwarehub.order_service.exception.ProductNotFoundException;
 import com.hardwarehub.order_service.exception.ProductOutOfStockException;
@@ -38,9 +39,9 @@ public class OrderService
     private final OrderItemMapper orderItemMapper;
 
     /**
-     * El metodo es estrictamente utilizado por el user-service
-     * al momento de registrar un usuario.
-     * No sera utilizado en ningun otro momento y tampoco sera accessible.
+     * This method is strictly used by the user-service
+     * during user registration.
+     * It will not be used or accessible at any other time.
      */
     public void create(int userId)
     {
@@ -67,6 +68,19 @@ public class OrderService
         order.setStatus(OrderStatus.PENDING);
 
         return orderMapper.entityToDTO(orderRepository.save(order));
+    }
+
+    // Only used when a user completes a purchase.
+    @Transactional
+    public void complete(int userId)
+    {
+        OrderEntity order = findPendingOrderOrThrow(userId);
+
+        order.setStatus(OrderStatus.COMPLETED);
+
+        // TODO: Remove stock from product-service.
+
+        create(userId);
     }
 
     @Transactional
@@ -160,7 +174,7 @@ public class OrderService
         OrderItemEntity item = orderItemRepository.findByOrderIdAndProductId(currentOrder.getId(), product.id())
                 .orElseGet(() -> buildItem(product, currentOrder));
 
-        updateItemQuantityAndPrice(item, 1, product);
+        updateItemQuantityAndPrice(item, item.getQuantity() + 1, product);
 
         updateOrderPrice(currentOrder);
 
@@ -193,14 +207,9 @@ public class OrderService
 
     private void updateItemQuantityAndPrice(OrderItemEntity item, int newQuantity, ProductResponseDTO product)
     {
-        if (newQuantity > product.stock()) throw new ProductOutOfStockException("Only " + product.stock() + " units are available.");
+        if (newQuantity < 1) throw new InvalidQuantityException("Quantity must be greater than zero.");
 
-        if (newQuantity < 1)
-        {
-            OrderEntity order = item.getOrder();
-            order.removeItem(item);
-            return;
-        }
+        if (newQuantity > product.stock()) throw new ProductOutOfStockException("Only " + product.stock() + " units are available.");
 
         item.setQuantity(newQuantity);
 
