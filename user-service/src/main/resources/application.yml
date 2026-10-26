@@ -2,5 +2,12 @@ spring:
   application:
     name: user-service
 
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100
+        one-indexed-parameters: false
+
   config:
     import: optional:configserver:http://localhost:8888

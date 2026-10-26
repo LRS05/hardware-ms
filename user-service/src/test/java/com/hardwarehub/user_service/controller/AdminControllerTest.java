@@ -7,6 +7,7 @@ import com.hardwarehub.user_service.dto.UserUpdateRequestDTO;
 import com.hardwarehub.user_service.enums.ApiError;
 import com.hardwarehub.user_service.enums.Role;
 import com.hardwarehub.user_service.entity.UserEntity;
+import com.hardwarehub.user_service.factory.UserFactory;
 import com.hardwarehub.user_service.repository.UserRepository;
 import com.hardwarehub.user_service.service.JwtService;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,7 +24,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.cloud.config.enabled=false")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
 @ActiveProfiles("test")
 @Import(PostgresTestConfig.class)
@@ -53,6 +54,7 @@ class AdminControllerTest
                 .baseUrl("http://localhost:" + port + "/api/v1/admin")
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + accessTokenCookie.getValue())
                 .build();
+
     }
 
     @Test
@@ -623,5 +625,99 @@ class AdminControllerTest
                 .expectBody()
                 .jsonPath("$.error").isEqualTo(ApiError.METHOD_ARGUMENT_TYPE_MISMATCH.name())
                 .jsonPath("$.message").isEqualTo("Invalid parameter type.");
+    }
+
+    // Authorization and not found tests
+
+    @Test
+    void getMe_whenRequestIsUnauthenticated_thenReturnUnauthorized()
+    {
+        RestTestClient unauthenticatedRestTestClient = RestTestClient.bindToServer()
+                .baseUrl("http://localhost:" + port + "/api/v1/admin")
+                .build();
+
+        unauthenticatedRestTestClient.get()
+                .uri("/me")
+                .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void getMe_whenCustomerIsAuthenticated_thenReturnForbidden()
+    {
+        ResponseCookie accessTokenCookie = jwtService.generateAccessTokenCookie(UserFactory.customer());
+
+        RestTestClient customerRestTestClient = RestTestClient.bindToServer()
+                .baseUrl("http://localhost:" + port + "/api/v1/admin")
+                .build();
+
+        customerRestTestClient.get()
+                .uri("/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessTokenCookie.getValue())
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void updateUserById_whenStaffIsAuthenticated_thenReturnForbidden()
+    {
+        int userId = 2;
+
+        UserEntity staff = UserFactory.customer();
+        staff.setRole(Role.STAFF);
+
+        ResponseCookie accessTokenCookie = jwtService.generateAccessTokenCookie(staff);
+
+        UserUpdateRequestDTO requestDTO = new UserUpdateRequestDTO(
+                "updated@example.com",
+                "updateduser",
+                "Updated",
+                "User"
+        );
+        RestTestClient staffRestTestClient = RestTestClient.bindToServer()
+                .baseUrl("http://localhost:" + port + "/api/v1/admin")
+                .build();
+
+        staffRestTestClient.patch()
+                .uri("/users/{id}", userId)
+                .body(requestDTO)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessTokenCookie.getValue())
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void getUserById_whenUserDoesNotExist_thenReturnNotFound()
+    {
+        int userId = 999;
+
+        ResponseCookie accessTokenCookie = jwtService.generateAccessTokenCookie(UserFactory.admin());
+
+        RestTestClient adminRestTestClient = RestTestClient.bindToServer()
+                .baseUrl("http://localhost:" + port + "/api/v1/admin")
+                .build();
+
+        adminRestTestClient.get()
+                .uri("/users/{id}", userId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessTokenCookie.getValue())
+                .exchange()
+                .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
+                .expectBody()
+                .jsonPath("$.error").isEqualTo(ApiError.USERNAME_NOT_FOUND.name())
+                .jsonPath("$.message").isEqualTo("User not found.");
+    }
+
+    @Test
+    void accessAdminEndpoints_whenInvalidToken_thenReturnUnauthorized()
+    {
+        RestTestClient invalidTokenClient = RestTestClient.bindToServer()
+                .baseUrl("http://localhost:" + port + "/api/v1/admin")
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer INVALID_TOKEN")
+                .build();
+
+        invalidTokenClient.get()
+                .uri("")
+                .exchange()
+                .expectStatus().isUnauthorized();
     }
 }

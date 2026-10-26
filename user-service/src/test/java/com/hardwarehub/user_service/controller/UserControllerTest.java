@@ -6,6 +6,7 @@ import com.hardwarehub.user_service.dto.PasswordUpdateRequestDTO;
 import com.hardwarehub.user_service.dto.UserUpdateRequestDTO;
 import com.hardwarehub.user_service.enums.ApiError;
 import com.hardwarehub.user_service.entity.UserEntity;
+import com.hardwarehub.user_service.factory.UserFactory;
 import com.hardwarehub.user_service.repository.UserRepository;
 import com.hardwarehub.user_service.service.JwtService;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,7 +24,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.cloud.config.enabled=false")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
 @ActiveProfiles("test")
 @Import(PostgresTestConfig.class)
@@ -53,6 +54,7 @@ class UserControllerTest
                 .baseUrl("http://localhost:" + port + "/api/v1/users")
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + accessTokenCookie.getValue())
                 .build();
+
     }
 
     @Test
@@ -359,5 +361,49 @@ class UserControllerTest
                 .expectStatus().isBadRequest()
                 .expectBody()
                 .jsonPath("$.password").isNotEmpty();
+    }
+
+    // Authorization tests
+
+    @Test
+    void getMe_whenRequestIsUnauthenticated_thenReturnUnauthorized()
+    {
+        RestTestClient unauthenticatedRestTestClient = RestTestClient.bindToServer()
+                .baseUrl("http://localhost:" + port + "/api/v1/users")
+                .build();
+
+        unauthenticatedRestTestClient.get()
+                .uri("/me")
+                .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void getMe_whenAdminIsAuthenticated_thenReturnForbidden()
+    {
+        ResponseCookie accessTokenCookie = jwtService.generateAccessTokenCookie(UserFactory.admin());
+
+        RestTestClient adminRestTestClient = RestTestClient.bindToServer()
+                .baseUrl("http://localhost:" + port + "/api/v1/users")
+                .build();
+
+        adminRestTestClient.get()
+                .uri("/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessTokenCookie.getValue())
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+    @Test
+    void accessUserEndpoints_whenInvalidToken_thenReturnUnauthorized()
+    {
+        RestTestClient invalidTokenClient = RestTestClient.bindToServer()
+                .baseUrl("http://localhost:" + port + "/api/v1/users")
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer INVALID_TOKEN")
+                .build();
+
+        invalidTokenClient.get()
+                .uri("")
+                .exchange()
+                .expectStatus().isUnauthorized();
     }
 }

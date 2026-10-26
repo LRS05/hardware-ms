@@ -23,7 +23,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.cloud.config.enabled=false")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
 @ActiveProfiles("test")
 @Import(PostgresTestConfig.class)
@@ -267,5 +267,24 @@ class AuthControllerTest
                         "refresh-token=;.*Max-Age=0;.*"
                 )
                 .expectBody().isEmpty();
+    }
+
+    @Test
+    void logout_whenRequestIsUnauthenticated_thenReturnUnauthorized()
+    {
+        restTestClient.post()
+                .uri("/logout")
+                .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void logout_whenInvalidToken_thenReturnUnauthorized()
+    {
+        restTestClient.post()
+                .uri("/logout")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer INVALID_TOKEN")
+                .exchange()
+                .expectStatus().isUnauthorized();
     }
 }
