@@ -86,18 +86,4 @@ public class ProductController
         productService.deactivateById(id);
         return ResponseEntity.ok("Product with id " + id + " successfully deactivated.");
     }
-
-    @PatchMapping("/{id}/decrease")
-    public ResponseEntity<Void> decreaseStockById(@PathVariable int id, @Valid @RequestBody StockRequestDTO requestDTO)
-    {
-        productService.decreaseStockById(id, requestDTO);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PatchMapping("/{id}/increase")
-    public ResponseEntity<Void> increaseStockById(@PathVariable int id, @Valid @RequestBody StockRequestDTO requestDTO)
-    {
-        productService.increaseStockById(id, requestDTO);
-        return ResponseEntity.noContent().build();
-    }
 }

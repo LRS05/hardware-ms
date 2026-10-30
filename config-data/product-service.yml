@@ -27,3 +27,14 @@ jwt:
     expiration: ${JWT_ACCESS_EXPIRATION}
   refresh:
     expiration: ${JWT_REFRESH_EXPIRATION}
+
+internal:
+  auth:
+    api-key: ${PRODUCT_SERVICE_API_KEY}
+  clients:
+    order-service:
+      api-key: ${ORDER_SERVICE_API_KEY}
+      permissions:
+        - PRODUCT_READ
+        - STOCK_INCREASE
+        - STOCK_DECREASE

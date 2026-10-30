@@ -9,6 +9,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 
@@ -18,6 +19,7 @@ import java.time.LocalDateTime;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withNoContent;
@@ -35,7 +37,7 @@ public class ProductClientTest
     {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        productClient = new ProductClient(builder);
+        productClient = new ProductClient(builder, "apiKey");
     }
 
     @Test
@@ -57,8 +59,9 @@ public class ProductClientTest
                 }
                 """;
 
-        server.expect(requestTo("http://product-service/api/v1/products/" + productId))
+        server.expect(requestTo("http://product-service/internal/products/" + productId))
                 .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-API-Key", "apiKey"))
                 .andExpect(content().string(""))
                 .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
@@ -83,8 +86,9 @@ public class ProductClientTest
     {
         int productId = 1;
 
-        server.expect(requestTo("http://product-service/api/v1/products/" + productId))
+        server.expect(requestTo("http://product-service/internal/products/" + productId))
                 .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-API-Key", "apiKey"))
                 .andExpect(content().string(""))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
@@ -100,8 +104,9 @@ public class ProductClientTest
     {
         int productId = 1;
 
-        server.expect(requestTo("http://product-service/api/v1/products/" + productId))
+        server.expect(requestTo("http://product-service/internal/products/" + productId))
                 .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-API-Key", "apiKey"))
                 .andExpect(content().string(""))
                 .andRespond(withStatus(HttpStatus.CONFLICT));
 
@@ -117,8 +122,9 @@ public class ProductClientTest
     {
         int productId = 1;
 
-        server.expect(requestTo("http://product-service/api/v1/products/" + productId))
+        server.expect(requestTo("http://product-service/internal/products/" + productId))
                 .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-API-Key", "apiKey"))
                 .andExpect(content().string(""))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
@@ -133,8 +139,9 @@ public class ProductClientTest
         int productId = 1;
         int quantity = 2;
 
-        server.expect(requestTo("http://product-service/api/v1/products/" + productId + "/decrease"))
+        server.expect(requestTo("http://product-service/internal/products/" + productId + "/decrease"))
                 .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header("X-API-Key", "apiKey"))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withNoContent());
@@ -150,8 +157,9 @@ public class ProductClientTest
         int productId = 1;
         int quantity = 2;
 
-        server.expect(requestTo("http://product-service/api/v1/products/" + productId + "/decrease"))
+        server.expect(requestTo("http://product-service/internal/products/" + productId + "/decrease"))
                 .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header("X-API-Key", "apiKey"))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
@@ -169,8 +177,9 @@ public class ProductClientTest
         int productId = 1;
         int quantity = 2;
 
-        server.expect(requestTo("http://product-service/api/v1/products/" + productId + "/decrease"))
+        server.expect(requestTo("http://product-service/internal/products/" + productId + "/decrease"))
                 .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header("X-API-Key", "apiKey"))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.CONFLICT));
@@ -188,8 +197,9 @@ public class ProductClientTest
         int productId = 1;
         int quantity = 2;
 
-        server.expect(requestTo("http://product-service/api/v1/products/" + productId + "/decrease"))
+        server.expect(requestTo("http://product-service/internal/products/" + productId + "/decrease"))
                 .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header("X-API-Key", "apiKey"))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
@@ -205,8 +215,9 @@ public class ProductClientTest
         int productId = 1;
         int quantity = 2;
 
-        server.expect(requestTo("http://product-service/api/v1/products/" + productId + "/increase"))
+        server.expect(requestTo("http://product-service/internal/products/" + productId + "/increase"))
                 .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header("X-API-Key", "apiKey"))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withNoContent());
@@ -222,8 +233,9 @@ public class ProductClientTest
         int productId = 1;
         int quantity = 2;
 
-        server.expect(requestTo("http://product-service/api/v1/products/" + productId + "/increase"))
+        server.expect(requestTo("http://product-service/internal/products/" + productId + "/increase"))
                 .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header("X-API-Key", "apiKey"))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
@@ -241,8 +253,9 @@ public class ProductClientTest
         int productId = 1;
         int quantity = 2;
 
-        server.expect(requestTo("http://product-service/api/v1/products/" + productId + "/increase"))
+        server.expect(requestTo("http://product-service/internal/products/" + productId + "/increase"))
                 .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header("X-API-Key", "apiKey"))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.CONFLICT));
@@ -260,13 +273,118 @@ public class ProductClientTest
         int productId = 1;
         int quantity = 2;
 
-        server.expect(requestTo("http://product-service/api/v1/products/" + productId + "/increase"))
+        server.expect(requestTo("http://product-service/internal/products/" + productId + "/increase"))
                 .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header("X-API-Key", "apiKey"))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         assertThrows(HttpServerErrorException.InternalServerError.class, () -> productClient.increaseStockById(productId, quantity));
+
+        server.verify();
+    }
+
+    @Test
+    void getById_whenProductServiceReturnsUnauthorized_thenThrowUnauthorizedException()
+    {
+        int productId = 1;
+
+        server.expect(requestTo("http://product-service/internal/products/" + productId))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(content().string(""))
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+
+        assertThrows(HttpClientErrorException.Unauthorized.class, () -> productClient.getById(productId));
+
+        server.verify();
+    }
+
+    @Test
+    void getById_whenProductServiceReturnsForbidden_thenThrowForbiddenException()
+    {
+        int productId = 1;
+
+        server.expect(requestTo("http://product-service/internal/products/" + productId))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(content().string(""))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+        assertThrows(HttpClientErrorException.Forbidden.class, () -> productClient.getById(productId));
+
+        server.verify();
+    }
+
+    @Test
+    void decreaseStockById_whenProductServiceReturnsUnauthorized_thenThrowUnauthorizedException()
+    {
+        int productId = 1;
+        int quantity = 2;
+
+        server.expect(requestTo("http://product-service/internal/products/" + productId + "/decrease"))
+                .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("{\"stock\":" + quantity + "}"))
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+
+        assertThrows(HttpClientErrorException.Unauthorized.class, () -> productClient.decreaseStockById(productId, quantity));
+
+        server.verify();
+    }
+
+    @Test
+    void decreaseStockById_whenProductServiceReturnsForbidden_thenThrowForbiddenException()
+    {
+        int productId = 1;
+        int quantity = 2;
+
+        server.expect(requestTo("http://product-service/internal/products/" + productId + "/decrease"))
+                .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("{\"stock\":" + quantity + "}"))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+        assertThrows(HttpClientErrorException.Forbidden.class, () -> productClient.decreaseStockById(productId, quantity));
+
+        server.verify();
+    }
+
+    @Test
+    void increaseStockById_whenProductServiceReturnsUnauthorized_thenThrowUnauthorizedException()
+    {
+        int productId = 1;
+        int quantity = 2;
+
+        server.expect(requestTo("http://product-service/internal/products/" + productId + "/increase"))
+                .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("{\"stock\":" + quantity + "}"))
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+
+        assertThrows(HttpClientErrorException.Unauthorized.class, () -> productClient.increaseStockById(productId, quantity));
+
+        server.verify();
+    }
+
+    @Test
+    void increaseStockById_whenProductServiceReturnsForbidden_thenThrowForbiddenException()
+    {
+        int productId = 1;
+        int quantity = 2;
+
+        server.expect(requestTo("http://product-service/internal/products/" + productId + "/increase"))
+                .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("{\"stock\":" + quantity + "}"))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+        assertThrows(HttpClientErrorException.Forbidden.class, () -> productClient.increaseStockById(productId, quantity));
 
         server.verify();
     }

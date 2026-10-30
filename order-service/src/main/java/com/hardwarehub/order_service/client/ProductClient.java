@@ -4,6 +4,7 @@ import com.hardwarehub.order_service.client.dto.ProductResponseDTO;
 import com.hardwarehub.order_service.client.dto.StockRequestDTO;
 import com.hardwarehub.order_service.exception.ProductNotFoundException;
 import com.hardwarehub.order_service.exception.ProductOutOfStockException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -13,10 +14,13 @@ public class ProductClient
 {
     private final RestClient restClient;
 
-    public ProductClient(RestClient.Builder restClient)
+    public ProductClient(
+            RestClient.Builder restClient,
+            @Value("${internal.auth.api-key}") String apiKey)
     {
         this.restClient = restClient
-                .baseUrl("http://product-service/api/v1/products")
+                .baseUrl("http://product-service/internal/products")
+                .defaultHeader("X-API-Key", apiKey)
                 .build();
     }
 
