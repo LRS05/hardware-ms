@@ -4,6 +4,8 @@ import com.hardwarehub.product_service.enums.Category;
 import com.hardwarehub.product_service.enums.ProductStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -34,6 +36,7 @@ public class ProductEntity
     @Column(nullable = false)
     private String name;
 
+    @Column(length = 300)
     private String description;
 
     @Column(precision = 10, scale = 2, nullable = false)
@@ -42,9 +45,11 @@ public class ProductEntity
     @Column(nullable = false)
     private Integer stock;
 
-    @Column(name = "created_at", nullable = false)
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 }

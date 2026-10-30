@@ -19,8 +19,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-
 @Service
 @RequiredArgsConstructor
 public class ProductService
@@ -41,8 +39,6 @@ public class ProductService
                         .description(requestDTO.description())
                         .price(requestDTO.price())
                         .stock(requestDTO.stock())
-                        .createdAt(LocalDateTime.now())
-                        .updatedAt(LocalDateTime.now())
                         .build()
         );
 
@@ -87,6 +83,7 @@ public class ProductService
         return products.map(productMapper::entityToDTO);
     }
 
+    // Only non-null and non-empty fields from the DTO will be updated.
     public ProductResponseDTO updateById(int id, ProductUpdateRequestDTO requestDTO)
     {
         ProductEntity product = findByIdOrThrow(id);
