@@ -58,6 +58,12 @@ public class GlobalExceptionHandler
         return sendErrorResponse(HttpStatus.CONFLICT, ApiError.PRODUCT_OUT_OF_STOCK, e.getMessage());
     }
 
+    @ExceptionHandler(PendingOrderExistsException.class)
+    public ResponseEntity<ErrorResponseDTO> handlePendingOrderExistsException(PendingOrderExistsException e)
+    {
+        return sendErrorResponse(HttpStatus.CONFLICT, ApiError.PENDING_ORDER_ALREADY_EXISTS, e.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponseDTO> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e)
     {
