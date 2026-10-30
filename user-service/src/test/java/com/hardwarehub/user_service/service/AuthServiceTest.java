@@ -1,6 +1,5 @@
 package com.hardwarehub.user_service.service;
 
-import com.hardwarehub.user_service.client.OrderClient;
 import com.hardwarehub.user_service.dto.AuthRequestDTO;
 import com.hardwarehub.user_service.dto.RegisterRequestDTO;
 import com.hardwarehub.user_service.entity.UserEntity;
@@ -54,9 +53,6 @@ public class AuthServiceTest
     @Mock
     private AuthenticationManager authenticationManager;
 
-    @Mock
-    private OrderClient orderClient;
-
     @InjectMocks
     private AuthService authService;
 
@@ -108,7 +104,6 @@ public class AuthServiceTest
         verifyNoMoreInteractions(userRepository);
         verify(passwordEncoder).encode(requestDTO.password());
         verifyNoMoreInteractions(passwordEncoder);
-        verify(orderClient).createByUserId(user.getId());
         verify(jwtService).generateAccessTokenCookie(user);
         verify(jwtService).generateRefreshTokenCookie(user);
     }
@@ -133,7 +128,7 @@ public class AuthServiceTest
         // Then
         verify(userRepository).existsByUsername(requestDTO.username());
         verifyNoMoreInteractions(userRepository);
-        verifyNoInteractions(passwordEncoder, orderClient, jwtService);
+        verifyNoInteractions(passwordEncoder, jwtService);
     }
 
     @Test
@@ -158,7 +153,7 @@ public class AuthServiceTest
         verify(userRepository).existsByUsername(requestDTO.username());
         verify(userRepository).existsByEmail(requestDTO.email());
         verifyNoMoreInteractions(userRepository);
-        verifyNoInteractions(passwordEncoder, orderClient, jwtService);
+        verifyNoInteractions(passwordEncoder, jwtService);
     }
 
     @Test
@@ -211,7 +206,7 @@ public class AuthServiceTest
         verify(authenticationManager).authenticate(
                 new UsernamePasswordAuthenticationToken(requestDTO.username(), requestDTO.password())
         );
-        verifyNoInteractions(userRepository, jwtService, passwordEncoder, orderClient);
+        verifyNoInteractions(userRepository, jwtService, passwordEncoder);
     }
 
     @Test
@@ -233,7 +228,7 @@ public class AuthServiceTest
         );
         verify(userRepository).findByUsername(requestDTO.username());
         verifyNoMoreInteractions(authenticationManager, userRepository);
-        verifyNoInteractions(jwtService, passwordEncoder, orderClient);
+        verifyNoInteractions(jwtService, passwordEncoder);
     }
 
     @Test
@@ -384,9 +379,8 @@ public class AuthServiceTest
         verify(jwtService).emptyCookie("access-token");
         verify(jwtService).emptyCookie("refresh-token");
         verifyNoMoreInteractions(jwtService);
-        verifyNoInteractions(userRepository, passwordEncoder, authenticationManager, orderClient);
+        verifyNoInteractions(userRepository, passwordEncoder, authenticationManager);
     }
-
     @Test
     void refresh_whenSubjectIsInvalid_thenThrowInvalidJwtExceptionWithoutLookingUpUser()
     {
@@ -400,4 +394,5 @@ public class AuthServiceTest
 
         verifyNoInteractions(userRepository);
     }
+
 }

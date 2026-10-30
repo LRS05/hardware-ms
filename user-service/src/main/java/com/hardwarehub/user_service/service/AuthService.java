@@ -1,6 +1,5 @@
 package com.hardwarehub.user_service.service;
 
-import com.hardwarehub.user_service.client.OrderClient;
 import com.hardwarehub.user_service.dto.AuthRequestDTO;
 import com.hardwarehub.user_service.dto.RegisterRequestDTO;
 import com.hardwarehub.user_service.entity.UserEntity;
@@ -30,7 +29,6 @@ public class AuthService
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
-    private final OrderClient orderClient;
 
     public Map<String, ResponseCookie> register(RegisterRequestDTO requestDTO)
     {
@@ -55,8 +53,6 @@ public class AuthService
                         .creationDate(LocalDateTime.now())
                         .build()
         );
-
-        orderClient.createByUserId(user.getId());
 
         return jwtCookies(user);
     }

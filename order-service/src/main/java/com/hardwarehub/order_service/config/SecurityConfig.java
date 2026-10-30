@@ -27,6 +27,8 @@ public class SecurityConfig
                         .requestMatchers("/api/v1/orders/**").hasRole("CUSTOMER")
 
                         .requestMatchers("/api/v1/admin/users/**").hasAnyRole("ADMIN", "STAFF")
+
+                        .anyRequest().denyAll()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt

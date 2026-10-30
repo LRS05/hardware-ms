@@ -121,27 +121,73 @@ public class OrderControllerTest
     }
 
     @Test
-    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
-    void createByUserId_whenNoActiveOrderExists_thenReturnNoContent()
+    void getActive_whenCustomerHasNoActiveOrder_thenReturnEmptyOrderWithoutSaving()
     {
-        int userId = 2;
-
-        customerRestTestClient.post()
-                .uri("/users/{userId}", userId)
+        createRestTestClientForRole("CUSTOMER", 3).get()
+                .uri("/active")
                 .exchange()
-                .expectStatus().isNoContent();
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(0)
+                .jsonPath("$.total_price").isEqualTo(0)
+                .jsonPath("$.order_items.length()").isEqualTo(0);
+
+        createRestTestClientForRole("CUSTOMER", 3).get()
+                .uri("?status={status}", OrderStatus.ACTIVE)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.totalElements").isEqualTo(0)
+                .jsonPath("$.content.length()").isEqualTo(0);
     }
 
     @Test
-    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
-    void createByUserId_whenActiveOrderAlreadyExists_thenReturnNoContent()
+    void addItemToOrder_whenCustomerHasNoActiveOrder_thenCreateOrderWithFirstItem()
     {
-        int userId = 1;
-
-        customerRestTestClient.post()
-                .uri("/users/{userId}", userId)
+        createRestTestClientForRole("CUSTOMER", 3).patch()
+                .uri("/active/items/products/{productId}", 1)
                 .exchange()
                 .expectStatus().isNoContent();
+
+        createRestTestClientForRole("CUSTOMER", 3).get()
+                .uri("/active")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(3)
+                .jsonPath("$.total_price").isEqualTo(1000)
+                .jsonPath("$.order_items.length()").isEqualTo(1)
+                .jsonPath("$.order_items[0].quantity").isEqualTo(1);
+
+        createRestTestClientForRole("CUSTOMER", 3).get()
+                .uri("?status={status}", OrderStatus.ACTIVE)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.totalElements").isEqualTo(1)
+                .jsonPath("$.content.length()").isEqualTo(1)
+                .jsonPath("$.content[0].id").isEqualTo(3);
+    }
+
+    @Test
+    void addItemToOrder_whenFirstItemExceedsStock_thenRollbackNewOrder()
+    {
+        when(productClient.getById(1)).thenReturn(ProductFactory.graphicCardDTO(0));
+
+        createRestTestClientForRole("CUSTOMER", 3).patch()
+                .uri("/active/items/products/{productId}", 1)
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_OUT_OF_STOCK.name());
+
+        createRestTestClientForRole("CUSTOMER", 3).get()
+                .uri("?status={status}", OrderStatus.ACTIVE)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.totalElements").isEqualTo(0)
+                .jsonPath("$.content.length()").isEqualTo(0);
     }
 
     @Test
@@ -482,7 +528,7 @@ public class OrderControllerTest
                 .expectStatus().isBadRequest()
                 .expectBody()
                 .jsonPath("$.error").isEqualTo(ApiError.EMPTY_ORDER.name())
-                .jsonPath("$.message").isEqualTo("Cannot checkout an empty order.");
+                .jsonPath("$.message").isEqualTo("Order is empty.");
     }
 
     @Test
@@ -625,7 +671,7 @@ public class OrderControllerTest
                     .expectStatus().isBadRequest()
                     .expectBody()
                     .jsonPath("$.error").isEqualTo(ApiError.EMPTY_ORDER.name())
-                    .jsonPath("$.message").isEqualTo("Cannot checkout an empty order.");
+                    .jsonPath("$.message").isEqualTo("Order is empty.");
         }
     }
 
@@ -735,5 +781,65 @@ public class OrderControllerTest
                 .uri("/{id}", 1)
                 .exchange()
                 .expectStatus().isNotFound();
+    }
+
+    @Test
+    void checkout_whenCustomerHasNoActiveOrder_thenReturnBadRequestWithoutCreatingOrder()
+    {
+        createRestTestClientForRole("CUSTOMER", 3).patch()
+                .uri("/active/checkout")
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.error").isEqualTo(ApiError.EMPTY_ORDER.name())
+                .jsonPath("$.message").isEqualTo("Order is empty.");
+
+        createRestTestClientForRole("CUSTOMER", 3).get()
+                .uri("?status={status}", OrderStatus.ACTIVE)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.totalElements").isEqualTo(0)
+                .jsonPath("$.content.length()").isEqualTo(0);
+    }
+
+    @Test
+    void refresh_whenCustomerHasNoActiveOrder_thenReturnBadRequestWithoutCreatingOrder()
+    {
+        createRestTestClientForRole("CUSTOMER", 3).patch()
+                .uri("/active/refresh")
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.error").isEqualTo(ApiError.EMPTY_ORDER.name())
+                .jsonPath("$.message").isEqualTo("Order is empty.");
+
+        createRestTestClientForRole("CUSTOMER", 3).get()
+                .uri("?status={status}", OrderStatus.ACTIVE)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.totalElements").isEqualTo(0)
+                .jsonPath("$.content.length()").isEqualTo(0);
+    }
+
+    @Test
+    void clear_whenCustomerHasNoActiveOrder_thenReturnBadRequestWithoutCreatingOrder()
+    {
+        createRestTestClientForRole("CUSTOMER", 3).patch()
+                .uri("/active/clear")
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.error").isEqualTo(ApiError.EMPTY_ORDER.name())
+                .jsonPath("$.message").isEqualTo("Order is empty.");
+
+        createRestTestClientForRole("CUSTOMER", 3).get()
+                .uri("?status={status}", OrderStatus.ACTIVE)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.totalElements").isEqualTo(0)
+                .jsonPath("$.content.length()").isEqualTo(0);
     }
 }

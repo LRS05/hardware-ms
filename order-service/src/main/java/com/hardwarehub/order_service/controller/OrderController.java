@@ -25,13 +25,6 @@ public class OrderController
 {
     private final OrderService orderService;
 
-    @PostMapping("/users/{userId}")
-    public ResponseEntity<Void> createByUserId(@PathVariable int userId)
-    {
-        orderService.create(userId);
-        return ResponseEntity.noContent().build();
-    }
-
     @PatchMapping("/active/checkout")
     public ResponseEntity<OrderResponseDTO> checkout(@AuthenticationPrincipal Jwt jwt)
     {

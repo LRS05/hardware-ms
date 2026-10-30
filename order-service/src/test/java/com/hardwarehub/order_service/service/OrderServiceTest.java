@@ -10,6 +10,7 @@ import com.hardwarehub.order_service.exception.EmptyOrderException;
 import com.hardwarehub.order_service.exception.ItemNotFoundException;
 import com.hardwarehub.order_service.exception.InvalidQuantityException;
 import com.hardwarehub.order_service.exception.OrderNotFoundException;
+import com.hardwarehub.order_service.exception.PendingOrderExistsException;
 import com.hardwarehub.order_service.exception.ProductNotFoundException;
 import com.hardwarehub.order_service.exception.ProductOutOfStockException;
 import com.hardwarehub.order_service.factory.OrderFactory;
@@ -55,45 +56,6 @@ public class OrderServiceTest
 
     @InjectMocks
     private OrderService orderService;
-
-    @Test
-    void create_whenNoActiveOrderExists_thenSaveNewActiveOrder()
-    {
-        // Given
-        int userId = 1;
-
-        when(orderRepository.existsByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(false);
-
-        // When
-        orderService.create(userId);
-
-        // Then
-        ArgumentCaptor<OrderEntity> captor = ArgumentCaptor.forClass(OrderEntity.class);
-        verify(orderRepository).save(captor.capture());
-        OrderEntity order = captor.getValue();
-
-        assertEquals(userId, order.getUserId());
-        assertEquals(OrderStatus.ACTIVE, order.getStatus());
-        assertEquals(BigDecimal.ZERO, order.getTotalPrice());
-        assertTrue(order.getOrderItems().isEmpty());
-    }
-
-    @Test
-    void create_whenActiveOrderAlreadyExists_thenDoNotSaveAnotherOrder()
-    {
-        // Given
-        int userId = 1;
-
-        when(orderRepository.existsByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(true);
-
-        // When
-        orderService.create(userId);
-
-        // Then
-        verify(orderRepository).existsByUserIdAndStatus(userId, OrderStatus.ACTIVE);
-        verifyNoMoreInteractions(orderRepository);
-        verifyNoInteractions(orderMapper, productClient, orderItemRepository);
-    }
 
     @Test
     void getActive_whenOrderExists_thenReturnOrder()
@@ -144,7 +106,7 @@ public class OrderServiceTest
     }
 
     @Test
-    void checkout_whenOrderDoesNotExist_thenThrowOrderNotFoundException()
+    void checkout_whenOrderDoesNotExist_thenThrowEmptyOrderException()
     {
         // Given
         int userId = 1;
@@ -152,9 +114,11 @@ public class OrderServiceTest
         when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.empty());
 
         // When
-        assertThrows(OrderNotFoundException.class, () -> orderService.checkout(userId));
+        EmptyOrderException exception = assertThrows(EmptyOrderException.class, () -> orderService.checkout(userId));
 
         // Then
+        assertEquals("Order is empty.", exception.getMessage());
+
         verify(orderRepository).findByUserIdAndStatus(userId, OrderStatus.ACTIVE);
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
@@ -195,7 +159,7 @@ public class OrderServiceTest
     }
 
     @Test
-    void refreshActiveOrder_whenOrderDoesNotExist_thenThrowOrderNotFoundException()
+    void refreshActiveOrder_whenOrderDoesNotExist_thenThrowEmptyOrderException()
     {
         // Given
         int userId = 1;
@@ -203,16 +167,18 @@ public class OrderServiceTest
         when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.empty());
 
         // When
-        assertThrows(OrderNotFoundException.class, () -> orderService.refreshActiveOrder(userId));
+        EmptyOrderException exception = assertThrows(EmptyOrderException.class, () -> orderService.refreshActiveOrder(userId));
 
         // Then
+        assertEquals("Order is empty.", exception.getMessage());
+
         verify(orderRepository).findByUserIdAndStatus(userId, OrderStatus.ACTIVE);
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
     }
 
     @Test
-    void clearActiveOrder_whenOrderDoesNotExist_thenThrowOrderNotFoundException()
+    void clearActiveOrder_whenOrderDoesNotExist_thenThrowEmptyOrderException()
     {
         // Given
         int userId = 1;
@@ -220,29 +186,50 @@ public class OrderServiceTest
         when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.empty());
 
         // When
-        assertThrows(OrderNotFoundException.class, () -> orderService.clearActiveOrder(userId));
+        EmptyOrderException exception = assertThrows(EmptyOrderException.class, () -> orderService.clearActiveOrder(userId));
 
         // Then
+        assertEquals("Order is empty.", exception.getMessage());
+
         verify(orderRepository).findByUserIdAndStatus(userId, OrderStatus.ACTIVE);
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
     }
 
     @Test
-    void getActive_whenOrderDoesNotExist_thenThrowOrderNotFoundException()
+    void getActive_whenOrderDoesNotExist_thenReturnEmptyOrderWithoutSaving()
     {
         // Given
         int userId = 1;
 
+        OrderResponseDTO orderDTO = new OrderResponseDTO(
+                0,
+                BigDecimal.ZERO,
+                List.of()
+        );
+
         when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.empty());
+        when(orderMapper.entityToDTO(any(OrderEntity.class))).thenReturn(orderDTO);
 
         // When
-        assertThrows(OrderNotFoundException.class, () -> orderService.getActive(userId));
+        OrderResponseDTO result = orderService.getActive(userId);
 
         // Then
+        assertEquals(orderDTO, result);
+
+        ArgumentCaptor<OrderEntity> captor = ArgumentCaptor.forClass(OrderEntity.class);
+        verify(orderMapper).entityToDTO(captor.capture());
+        OrderEntity order = captor.getValue();
+
+        assertEquals(0, order.getId());
+        assertEquals(userId, order.getUserId());
+        assertEquals(OrderStatus.ACTIVE, order.getStatus());
+        assertEquals(BigDecimal.ZERO, order.getTotalPrice());
+        assertTrue(order.getOrderItems().isEmpty());
+
         verify(orderRepository).findByUserIdAndStatus(userId, OrderStatus.ACTIVE);
         verifyNoMoreInteractions(orderRepository);
-        verifyNoInteractions(orderMapper, productClient, orderItemRepository);
+        verifyNoInteractions(productClient, orderItemRepository);
     }
 
     @Test
@@ -608,7 +595,7 @@ public class OrderServiceTest
     }
 
     @Test
-    void complete_whenActiveOrderExists_thenCompleteAndCreateNewActiveOrder()
+    void complete_whenPendingOrderExists_thenCompleteWithoutCreatingAnotherOrder()
     {
         // Given
         int userId = 1;
@@ -617,21 +604,16 @@ public class OrderServiceTest
         order.setStatus(OrderStatus.PENDING);
 
         when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.PENDING)).thenReturn(Optional.of(order));
-        when(orderRepository.existsByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(false);
 
         // When
         orderService.complete(userId);
 
         // Then
-        ArgumentCaptor<OrderEntity> captor = ArgumentCaptor.forClass(OrderEntity.class);
-        verify(orderRepository).save(captor.capture());
-        OrderEntity newOrder = captor.getValue();
-
         assertEquals(OrderStatus.COMPLETED, order.getStatus());
-        assertEquals(userId, newOrder.getUserId());
-        assertEquals(OrderStatus.ACTIVE, newOrder.getStatus());
-        assertEquals(BigDecimal.ZERO, newOrder.getTotalPrice());
-        assertTrue(newOrder.getOrderItems().isEmpty());
+
+        verify(orderRepository).findByUserIdAndStatus(userId, OrderStatus.PENDING);
+        verifyNoMoreInteractions(orderRepository);
+        verifyNoInteractions(orderMapper, productClient, orderItemRepository);
     }
 
     @Test
@@ -938,6 +920,7 @@ public class OrderServiceTest
         assertEquals(product.name(), item.getProductName());
 
         verify(orderItemRepository).save(item);
+        verify(orderRepository, never()).save(any(OrderEntity.class));
     }
 
     @Test
@@ -981,6 +964,7 @@ public class OrderServiceTest
         assertEquals(product.name(), item.getProductName());
 
         verify(orderItemRepository).save(item);
+        verify(orderRepository, never()).save(any(OrderEntity.class));
     }
 
     @Test
@@ -1021,10 +1005,16 @@ public class OrderServiceTest
     }
 
     @Test
-    void addItem_whenActiveOrderDoesNotExist_thenThrowOrderNotFoundException()
+    void addItem_whenActiveOrderDoesNotExist_thenCreateOrderAndAddFirstItem()
     {
         // Given
         int userId = 1;
+        int productId = 1;
+
+        OrderEntity order = OrderFactory.activeOrder();
+        order.setId(3);
+        order.setTotalPrice(BigDecimal.ZERO);
+        order.getOrderItems().clear();
 
         ProductResponseDTO product = new ProductResponseDTO(
                 1,
@@ -1039,15 +1029,70 @@ public class OrderServiceTest
                 null
         );
 
-        when(productClient.getById(1)).thenReturn(product);
+        when(productClient.getById(productId)).thenReturn(product);
         when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.empty());
+        when(orderRepository.save(any(OrderEntity.class))).thenReturn(order);
+        when(orderItemRepository.findByOrderIdAndProductId(order.getId(), productId)).thenReturn(Optional.empty());
 
         // When
-        assertThrows(OrderNotFoundException.class, () -> orderService.addItem(userId, 1));
+        orderService.addItem(userId, productId);
 
         // Then
+        ArgumentCaptor<OrderEntity> captor = ArgumentCaptor.forClass(OrderEntity.class);
+        verify(orderRepository).save(captor.capture());
+        OrderEntity newOrder = captor.getValue();
+
+        assertEquals(userId, newOrder.getUserId());
+        assertEquals(OrderStatus.ACTIVE, newOrder.getStatus());
+        assertEquals(BigDecimal.ZERO, newOrder.getTotalPrice());
+        assertTrue(newOrder.getOrderItems().isEmpty());
+
+        OrderItemEntity item = order.getOrderItems().get(0);
+
+        assertEquals(1, order.getOrderItems().size());
+        assertEquals(1, item.getQuantity());
+        assertEquals(BigDecimal.valueOf(1500), item.getPrice());
+        assertEquals(item.getPrice(), order.getTotalPrice());
+        assertSame(order, item.getOrder());
+        assertEquals(productId, item.getProductId());
+        assertEquals(product.name(), item.getProductName());
+
+        verify(orderItemRepository).findByOrderIdAndProductId(order.getId(), productId);
+        verify(orderItemRepository).save(item);
+    }
+
+    @Test
+    void addItem_whenPendingOrderExists_thenThrowPendingOrderExistsException()
+    {
+        // Given
+        int userId = 1;
+        int productId = 1;
+
+        ProductResponseDTO product = new ProductResponseDTO(
+                1,
+                "ACTIVE",
+                "GRAPHIC_CARD",
+                "GPU-001",
+                "NVIDIA GTX 1080-TI",
+                "Graphics card",
+                BigDecimal.valueOf(1500),
+                10,
+                null,
+                null
+        );
+
+        when(productClient.getById(productId)).thenReturn(product);
+        when(orderRepository.existsByUserIdAndStatus(userId, OrderStatus.PENDING)).thenReturn(true);
+
+        // When
+        PendingOrderExistsException exception = assertThrows(PendingOrderExistsException.class, () -> orderService.addItem(userId, productId));
+
+        // Then
+        assertEquals("You have a pending order.", exception.getMessage());
+
+        verify(orderRepository).existsByUserIdAndStatus(userId, OrderStatus.PENDING);
+        verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderItemRepository);
-        verify(orderRepository, never()).save(any(OrderEntity.class));
     }
 
     @Test

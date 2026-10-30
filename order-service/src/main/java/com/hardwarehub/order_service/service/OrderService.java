@@ -6,12 +6,7 @@ import com.hardwarehub.order_service.dto.OrderResponseDTO;
 import com.hardwarehub.order_service.entity.OrderEntity;
 import com.hardwarehub.order_service.entity.OrderItemEntity;
 import com.hardwarehub.order_service.enums.OrderStatus;
-import com.hardwarehub.order_service.exception.EmptyOrderException;
-import com.hardwarehub.order_service.exception.ItemNotFoundException;
-import com.hardwarehub.order_service.exception.InvalidQuantityException;
-import com.hardwarehub.order_service.exception.OrderNotFoundException;
-import com.hardwarehub.order_service.exception.ProductNotFoundException;
-import com.hardwarehub.order_service.exception.ProductOutOfStockException;
+import com.hardwarehub.order_service.exception.*;
 import com.hardwarehub.order_service.mapper.OrderItemMapper;
 import com.hardwarehub.order_service.mapper.OrderMapper;
 import com.hardwarehub.order_service.repository.OrderItemRepository;
@@ -38,19 +33,6 @@ public class OrderService
     private final OrderItemRepository orderItemRepository;
     private final OrderItemMapper orderItemMapper;
 
-    /**
-     * This method is strictly used by the user-service
-     * during user registration.
-     * It will not be used or accessible at any other time.
-     */
-    public void create(int userId)
-    {
-        if (!orderRepository.existsByUserIdAndStatus(userId, OrderStatus.ACTIVE))
-        {
-            orderRepository.save(buildOrder(userId));
-        }
-    }
-
     @Transactional(noRollbackFor = EmptyOrderException.class)
     public OrderResponseDTO checkout(int userId)
     {
@@ -58,10 +40,7 @@ public class OrderService
 
         refreshOrderAndItemsPrice(order);
 
-        if (order.getOrderItems().isEmpty())
-        {
-            throw new EmptyOrderException("Cannot checkout an empty order.");
-        }
+        validateOrderIsNotEmpty(order);
 
         reserveProductStock(order);
 
@@ -77,10 +56,6 @@ public class OrderService
         OrderEntity order = findPendingOrderOrThrow(userId);
 
         order.setStatus(OrderStatus.COMPLETED);
-
-        // TODO: Remove stock from product-service.
-
-        create(userId);
     }
 
     @Transactional
@@ -99,6 +74,7 @@ public class OrderService
     public void refreshActiveOrder(int userId)
     {
         OrderEntity order = findActiveOrderOrThrow(userId);
+
         refreshOrderAndItemsPrice(order);
     }
 
@@ -115,9 +91,12 @@ public class OrderService
         order.setTotalPrice(BigDecimal.ZERO);
     }
 
+    // Return an empty order without persisting it if the user has no active order.
     public OrderResponseDTO getActive(int userId)
     {
-        OrderEntity order = findActiveOrderOrThrow(userId);
+        OrderEntity order = orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)
+                .orElseGet(() -> buildOrder(userId));
+
         return orderMapper.entityToDTO(order);
     }
 
@@ -169,7 +148,7 @@ public class OrderService
     {
         ProductResponseDTO product = productClient.getById(productId);
 
-        OrderEntity currentOrder = findActiveOrderOrThrow(userId);
+        OrderEntity currentOrder = findActiveOrderOrCreate(userId);
 
         OrderItemEntity item = orderItemRepository.findByOrderIdAndProductId(currentOrder.getId(), product.id())
                 .orElseGet(() -> buildItem(product, currentOrder));
@@ -306,15 +285,34 @@ public class OrderService
                 .orElseThrow(() -> new OrderNotFoundException("Pending order not found."));
     }
 
-    private OrderEntity findActiveOrderOrThrow(int userId)
+    private OrderEntity findActiveOrderOrCreate(int userId)
     {
+        if (orderRepository.existsByUserIdAndStatus(userId, OrderStatus.PENDING))
+        {
+            throw new PendingOrderExistsException("You have a pending order.");
+        }
+
         return orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)
-                .orElseThrow(() -> new OrderNotFoundException("Active order not found."));
+                .orElseGet(() -> orderRepository.save(buildOrder(userId)));
     }
 
     private OrderItemEntity findActiveItemByIdAndUserId(int id, int userId)
     {
         return orderItemRepository.findActiveItemByIdAndUserId(id, userId)
                 .orElseThrow(() -> new ItemNotFoundException("Item not found."));
+    }
+
+    private void validateOrderIsNotEmpty(OrderEntity order)
+    {
+        if (order.getOrderItems().isEmpty())
+        {
+            throw new EmptyOrderException("Order is empty.");
+        }
+    }
+
+    private OrderEntity findActiveOrderOrThrow(int userId)
+    {
+        return orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)
+                .orElseThrow(() -> new EmptyOrderException("Order is empty."));
     }
 }

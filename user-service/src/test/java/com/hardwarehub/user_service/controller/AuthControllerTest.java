@@ -1,6 +1,5 @@
 package com.hardwarehub.user_service.controller;
 
-import com.hardwarehub.user_service.client.OrderClient;
 import com.hardwarehub.user_service.config.PostgresTestConfig;
 import com.hardwarehub.user_service.dto.AuthRequestDTO;
 import com.hardwarehub.user_service.dto.RegisterRequestDTO;
@@ -19,7 +18,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
@@ -39,9 +37,6 @@ class AuthControllerTest
 
     @Autowired
     private JwtService jwtService;
-
-    @MockitoBean
-    private OrderClient orderClient;
 
     @BeforeEach
     void setUp()

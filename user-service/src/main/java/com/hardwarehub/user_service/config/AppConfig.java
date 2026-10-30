@@ -2,7 +2,6 @@ package com.hardwarehub.user_service.config;
 
 import com.hardwarehub.user_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -13,7 +12,6 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.client.RestClient;
 
 @Configuration
 @RequiredArgsConstructor
@@ -46,12 +44,5 @@ public class AppConfig
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService());
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
-    }
-
-    @Bean
-    @LoadBalanced
-    public RestClient.Builder restClientBuilder()
-    {
-        return RestClient.builder();
     }
 }
