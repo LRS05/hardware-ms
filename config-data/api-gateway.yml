@@ -10,6 +10,14 @@ spring:
       server:
         webmvc:
           routes:
+            - id: order-service-admin
+              uri: lb://order-service
+              predicates:
+                - Path=/api/v1/admin/users/{userId}/orders,/api/v1/admin/users/orders/{id}
+                - Method=GET
+              filters:
+                - JwtPropagation
+
             - id: user-service
               uri: lb://user-service
               predicates:
