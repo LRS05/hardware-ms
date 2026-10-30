@@ -87,20 +87,29 @@ public class OrderControllerTest
 
     private RestTestClient createRestTestClientForRole(String role, int userId)
     {
+        return createRestTestClientForRole(role, String.valueOf(userId));
+    }
+
+    private RestTestClient createRestTestClientForRole(String role, String subject)
+    {
         RestTestClient.Builder builder = RestTestClient.bindToServer()
                 .baseUrl("http://localhost:" + port + "/api/v1/orders");
 
         if (role != null)
         {
             Instant now = Instant.now();
-            JwtClaimsSet claims = JwtClaimsSet.builder()
-                    .subject("order-controller-test")
+            JwtClaimsSet.Builder claimsBuilder = JwtClaimsSet.builder()
                     .issuedAt(now)
                     .expiresAt(now.plusMillis(accessTokenExpiration))
-                    .claim("userId", userId)
                     .claim("type", "ACCESS")
-                    .claim("role", role)
-                    .build();
+                    .claim("role", role);
+
+            if (subject != null)
+            {
+                claimsBuilder.subject(subject);
+            }
+
+            JwtClaimsSet claims = claimsBuilder.build();
 
             JwsHeader header = JwsHeader.with(MacAlgorithm.HS512).build();
             String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
@@ -699,5 +708,32 @@ public class OrderControllerTest
                 .uri("")
                 .exchange()
                 .expectStatus().isForbidden();
+    }
+
+    @Test
+    void accessOrderEndpoints_whenSubjectIsUsername_thenReturnUnauthorized()
+    {
+        createRestTestClientForRole("CUSTOMER", "Marceloviviani").get()
+                .uri("/active")
+                .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void accessOrderEndpoints_whenSubjectIsMissing_thenReturnUnauthorized()
+    {
+        createRestTestClientForRole("CUSTOMER", null).get()
+                .uri("/active")
+                .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void getById_whenOrderBelongsToAnotherSubject_thenReturnNotFound()
+    {
+        createRestTestClientForRole("CUSTOMER", 2).get()
+                .uri("/{id}", 1)
+                .exchange()
+                .expectStatus().isNotFound();
     }
 }

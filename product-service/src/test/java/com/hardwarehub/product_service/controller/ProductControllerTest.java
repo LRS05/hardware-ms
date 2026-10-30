@@ -82,7 +82,7 @@ public class ProductControllerTest
         {
             Instant now = Instant.now();
             JwtClaimsSet claims = JwtClaimsSet.builder()
-                    .subject("product-controller-test")
+                    .subject("1")
                     .issuedAt(now)
                     .expiresAt(now.plusMillis(accessTokenExpiration))
                     .claim("type", "ACCESS")

@@ -406,4 +406,46 @@ class UserControllerTest
                 .exchange()
                 .expectStatus().isUnauthorized();
     }
+
+    @Test
+    void getMe_whenUsernameChanges_thenSameAccessTokenStillIdentifiesUser()
+    {
+        restTestClient.patch()
+                .uri("/me")
+                .body(new UserUpdateRequestDTO(null, "updatedusername", null, null))
+                .exchange()
+                .expectStatus().isOk();
+
+        restTestClient.get()
+                .uri("/me")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(2)
+                .jsonPath("$.username").isEqualTo("updatedusername");
+    }
+
+    @Test
+    void refresh_whenUsernameChanges_thenSameRefreshTokenStillIdentifiesUser()
+    {
+        UserEntity user = userRepository.findById(2).orElseThrow();
+        ResponseCookie refreshCookie = jwtService.generateRefreshTokenCookie(user);
+
+        restTestClient.patch()
+                .uri("/me")
+                .body(new UserUpdateRequestDTO(null, "updatedusername", null, null))
+                .exchange()
+                .expectStatus().isOk();
+
+        RestTestClient.bindToServer()
+                .baseUrl("http://localhost:" + port)
+                .build()
+                .post()
+                .uri("/api/v1/auth/refresh")
+                .header(HttpHeaders.COOKIE, "refresh-token=" + refreshCookie.getValue())
+                .exchange()
+                .expectStatus().isNoContent()
+                .expectHeader().valuesMatch(HttpHeaders.SET_COOKIE, "access-token=[^;]+;.*");
+    }
+
 }

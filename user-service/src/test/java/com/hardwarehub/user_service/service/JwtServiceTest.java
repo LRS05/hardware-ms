@@ -68,8 +68,9 @@ public class JwtServiceTest
         assertEquals("Strict", result.getSameSite());
         assertEquals("/", result.getPath());
 
-        assertEquals(user.getUsername(), claims.getSubject());
-        assertEquals(user.getId(), claims.get("userId", Integer.class));
+        assertEquals(String.valueOf(user.getId()), claims.getSubject());
+        assertEquals(user.getUsername(), claims.get("username", String.class));
+        assertFalse(claims.containsKey("userId"));
         assertEquals(user.getRole().name(), claims.get("role", String.class));
         assertEquals("ACCESS", claims.get("type", String.class));
         assertNotNull(claims.getId());
@@ -104,8 +105,9 @@ public class JwtServiceTest
         assertEquals("Strict", result.getSameSite());
         assertEquals("/", result.getPath());
 
-        assertEquals(user.getUsername(), claims.getSubject());
-        assertEquals(user.getId(), claims.get("userId", Integer.class));
+        assertEquals(String.valueOf(user.getId()), claims.getSubject());
+        assertEquals(user.getUsername(), claims.get("username", String.class));
+        assertFalse(claims.containsKey("userId"));
         assertEquals(user.getRole().name(), claims.get("role", String.class));
         assertEquals("REFRESH", claims.get("type", String.class));
         assertNotNull(claims.getId());
@@ -225,7 +227,7 @@ public class JwtServiceTest
     }
 
     @Test
-    void getSubject_whenTokenIsValid_thenReturnUsername()
+    void getSubject_whenTokenIsValid_thenReturnUserId()
     {
         // Given
         UserEntity user = UserFactory.customer();
@@ -235,7 +237,7 @@ public class JwtServiceTest
         String result = jwtService.getSubject(accessTokenCookie.getValue());
 
         // Then
-        assertEquals(user.getUsername(), result);
+        assertEquals(String.valueOf(user.getId()), result);
     }
 
     @Test
@@ -304,4 +306,86 @@ public class JwtServiceTest
         assertEquals("Strict", result.getSameSite());
         assertEquals("/", result.getPath());
     }
+
+    @Test
+    void isValid_whenUsernameChanges_thenReturnTrue()
+    {
+        UserEntity user = UserFactory.customer();
+        String token = jwtService.generateAccessTokenCookie(user).getValue();
+
+        user.setUsername("UpdatedUsername");
+
+        assertTrue(jwtService.isValid(token, user));
+    }
+
+    @Test
+    void getUserId_whenTokenIsValid_thenReturnUserId()
+    {
+        UserEntity user = UserFactory.customer();
+        String token = jwtService.generateRefreshTokenCookie(user).getValue();
+
+        assertEquals(user.getId(), jwtService.getUserId(token));
+    }
+
+    @Test
+    void getUserId_whenSubjectIsUsername_thenThrowInvalidJwtException()
+    {
+        String token = buildTokenWithSubject("Marceloviviani");
+
+        assertThrows(InvalidJwtException.class, () -> jwtService.getUserId(token));
+    }
+
+    @Test
+    void getUserId_whenSubjectIsMissing_thenThrowInvalidJwtException()
+    {
+        String token = buildTokenWithSubject(null);
+
+        assertThrows(InvalidJwtException.class, () -> jwtService.getUserId(token));
+    }
+
+    @Test
+    void getUserId_whenSubjectIsOutOfRange_thenThrowInvalidJwtException()
+    {
+        String token = buildTokenWithSubject("2147483648");
+
+        assertThrows(InvalidJwtException.class, () -> jwtService.getUserId(token));
+    }
+
+    @Test
+    void getUserId_whenSubjectIsZero_thenThrowInvalidJwtException()
+    {
+        String token = buildTokenWithSubject("0");
+
+        assertThrows(InvalidJwtException.class, () -> jwtService.getUserId(token));
+    }
+
+    @Test
+    void getUserId_whenSubjectIsNegative_thenThrowInvalidJwtException()
+    {
+        String token = buildTokenWithSubject("-1");
+
+        assertThrows(InvalidJwtException.class, () -> jwtService.getUserId(token));
+    }
+
+    @Test
+    void isValid_whenSubjectIsUsername_thenReturnFalse()
+    {
+        String token = buildTokenWithSubject("Marceloviviani");
+
+        assertFalse(jwtService.isValid(token, UserFactory.customer()));
+    }
+
+    private String buildTokenWithSubject(String subject)
+    {
+        SecretKey key = Keys.hmacShaKeyFor(
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.UTF_8)
+        );
+
+        return Jwts.builder()
+                .subject(subject)
+                .claim("type", "REFRESH")
+                .signWith(key)
+                .compact();
+    }
+
 }

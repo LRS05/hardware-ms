@@ -69,10 +69,9 @@ public class AdminControllerTest
         {
             Instant now = Instant.now();
             JwtClaimsSet claims = JwtClaimsSet.builder()
-                    .subject("admin-controller-test")
+                    .subject(String.valueOf(userId))
                     .issuedAt(now)
                     .expiresAt(now.plusMillis(accessTokenExpiration))
-                    .claim("userId", userId)
                     .claim("type", "ACCESS")
                     .claim("role", role)
                     .build();

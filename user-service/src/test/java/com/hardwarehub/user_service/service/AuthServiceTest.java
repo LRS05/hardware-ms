@@ -240,7 +240,7 @@ public class AuthServiceTest
     void refresh_whenRefreshTokenIsValid_thenReturnAccessCookie()
     {
         // Given
-        String username = "Marceloviviani";
+        int userId = 2;
         String refreshToken = "refresh-token-value";
         Cookie[] cookies = {new Cookie("refresh-token", refreshToken)};
 
@@ -248,8 +248,8 @@ public class AuthServiceTest
         ResponseCookie accessTokenCookie = ResponseCookie.from("access-token", "new-access-token-value").build();
 
         when(jwtService.getTokenFromCookies(TokenType.REFRESH, cookies)).thenReturn(refreshToken);
-        when(jwtService.getSubject(refreshToken)).thenReturn(username);
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(jwtService.getUserId(refreshToken)).thenReturn(userId);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(jwtService.getType(refreshToken)).thenReturn("REFRESH");
         when(jwtService.isValid(refreshToken, user)).thenReturn(true);
         when(jwtService.generateAccessTokenCookie(user)).thenReturn(accessTokenCookie);
@@ -261,8 +261,8 @@ public class AuthServiceTest
         assertEquals(accessTokenCookie, result);
 
         verify(jwtService).getTokenFromCookies(TokenType.REFRESH, cookies);
-        verify(jwtService).getSubject(refreshToken);
-        verify(userRepository).findByUsername(username);
+        verify(jwtService).getUserId(refreshToken);
+        verify(userRepository).findById(userId);
         verify(jwtService).getType(refreshToken);
         verify(jwtService).isValid(refreshToken, user);
         verify(jwtService).generateAccessTokenCookie(user);
@@ -290,21 +290,21 @@ public class AuthServiceTest
     void refresh_whenTokenUserDoesNotExist_thenThrowUsernameNotFoundException()
     {
         // Given
-        String username = "missingUser";
+        int userId = 999;
         String refreshToken = "refresh-token-value";
         Cookie[] cookies = {new Cookie("refresh-token", refreshToken)};
 
         when(jwtService.getTokenFromCookies(TokenType.REFRESH, cookies)).thenReturn(refreshToken);
-        when(jwtService.getSubject(refreshToken)).thenReturn(username);
-        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+        when(jwtService.getUserId(refreshToken)).thenReturn(userId);
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         // When
         assertThrows(UsernameNotFoundException.class, () -> authService.refresh(cookies));
 
         // Then
         verify(jwtService).getTokenFromCookies(TokenType.REFRESH, cookies);
-        verify(jwtService).getSubject(refreshToken);
-        verify(userRepository).findByUsername(username);
+        verify(jwtService).getUserId(refreshToken);
+        verify(userRepository).findById(userId);
         verifyNoMoreInteractions(jwtService, userRepository);
     }
 
@@ -312,15 +312,15 @@ public class AuthServiceTest
     void refresh_whenTokenTypeIsNotRefresh_thenThrowInvalidJwtException()
     {
         // Given
-        String username = "Marceloviviani";
+        int userId = 2;
         String refreshToken = "access-token-value";
         Cookie[] cookies = {new Cookie("refresh-token", refreshToken)};
 
         UserEntity user = UserFactory.customer();
 
         when(jwtService.getTokenFromCookies(TokenType.REFRESH, cookies)).thenReturn(refreshToken);
-        when(jwtService.getSubject(refreshToken)).thenReturn(username);
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(jwtService.getUserId(refreshToken)).thenReturn(userId);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(jwtService.getType(refreshToken)).thenReturn("ACCESS");
 
         // When
@@ -328,8 +328,8 @@ public class AuthServiceTest
 
         // Then
         verify(jwtService).getTokenFromCookies(TokenType.REFRESH, cookies);
-        verify(jwtService).getSubject(refreshToken);
-        verify(userRepository).findByUsername(username);
+        verify(jwtService).getUserId(refreshToken);
+        verify(userRepository).findById(userId);
         verify(jwtService).getType(refreshToken);
         verifyNoMoreInteractions(jwtService, userRepository);
     }
@@ -338,15 +338,15 @@ public class AuthServiceTest
     void refresh_whenTokenIsInvalidOrExpired_thenThrowInvalidJwtException()
     {
         // Given
-        String username = "Marceloviviani";
+        int userId = 2;
         String refreshToken = "expired-refresh-token-value";
         Cookie[] cookies = {new Cookie("refresh-token", refreshToken)};
 
         UserEntity user = UserFactory.customer();
 
         when(jwtService.getTokenFromCookies(TokenType.REFRESH, cookies)).thenReturn(refreshToken);
-        when(jwtService.getSubject(refreshToken)).thenReturn(username);
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(jwtService.getUserId(refreshToken)).thenReturn(userId);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(jwtService.getType(refreshToken)).thenReturn("REFRESH");
         when(jwtService.isValid(refreshToken, user)).thenReturn(false);
 
@@ -355,8 +355,8 @@ public class AuthServiceTest
 
         // Then
         verify(jwtService).getTokenFromCookies(TokenType.REFRESH, cookies);
-        verify(jwtService).getSubject(refreshToken);
-        verify(userRepository).findByUsername(username);
+        verify(jwtService).getUserId(refreshToken);
+        verify(userRepository).findById(userId);
         verify(jwtService).getType(refreshToken);
         verify(jwtService).isValid(refreshToken, user);
         verifyNoMoreInteractions(jwtService, userRepository);
@@ -385,5 +385,19 @@ public class AuthServiceTest
         verify(jwtService).emptyCookie("refresh-token");
         verifyNoMoreInteractions(jwtService);
         verifyNoInteractions(userRepository, passwordEncoder, authenticationManager, orderClient);
+    }
+
+    @Test
+    void refresh_whenSubjectIsInvalid_thenThrowInvalidJwtExceptionWithoutLookingUpUser()
+    {
+        String refreshToken = "refresh-token-value";
+        Cookie[] cookies = {new Cookie("refresh-token", refreshToken)};
+
+        when(jwtService.getTokenFromCookies(TokenType.REFRESH, cookies)).thenReturn(refreshToken);
+        when(jwtService.getUserId(refreshToken)).thenThrow(new InvalidJwtException("Invalid JWT subject."));
+
+        assertThrows(InvalidJwtException.class, () -> authService.refresh(cookies));
+
+        verifyNoInteractions(userRepository);
     }
 }

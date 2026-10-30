@@ -51,8 +51,8 @@ public class JwtService
     {
         try
         {
-            String username = getSubject(token);
-            return user.getUsername().equals(username) && parseToken(token).getExpiration().after(new Date());
+            int userId = getUserId(token);
+            return user.getId() == userId && parseToken(token).getExpiration().after(new Date());
         }
         catch (JwtException e)
         {
@@ -76,6 +76,25 @@ public class JwtService
     public String getSubject(String token)
     {
         return parseToken(token).getSubject();
+    }
+
+    public int getUserId(String token)
+    {
+        try
+        {
+            int userId = Integer.parseInt(getSubject(token));
+
+            if (userId <= 0)
+            {
+                throw new InvalidJwtException("Invalid JWT subject.");
+            }
+
+            return userId;
+        }
+        catch (NumberFormatException e)
+        {
+            throw new InvalidJwtException("Invalid JWT subject.");
+        }
     }
 
     public String getType(String token)
@@ -119,9 +138,9 @@ public class JwtService
     {
         return Jwts.builder()
                 .id(UUID.randomUUID().toString())
-                .subject(user.getUsername())
+                .subject(String.valueOf(user.getId()))
                 .claims(Map.of(
-                        "userId", user.getId(),
+                        "username", user.getUsername(),
                         "role", user.getRole(),
                         "type", type
                 ))

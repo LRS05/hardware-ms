@@ -77,7 +77,7 @@ public class AuthService
     {
         String refreshToken = jwtService.getTokenFromCookies(TokenType.REFRESH, cookies);
 
-        UserEntity user = findUserByUsernameOrThrow(jwtService.getSubject(refreshToken));
+        UserEntity user = findUserByIdOrThrow(jwtService.getUserId(refreshToken));
 
         if (!jwtService.getType(refreshToken).equals("REFRESH") || !jwtService.isValid(refreshToken, user))
         {
@@ -101,6 +101,12 @@ public class AuthService
                 "access-token", jwtService.generateAccessTokenCookie(user),
                 "refresh-token", jwtService.generateRefreshTokenCookie(user)
         );
+    }
+
+    private UserEntity findUserByIdOrThrow(int userId)
+    {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found."));
     }
 
     private UserEntity findUserByUsernameOrThrow(String username)

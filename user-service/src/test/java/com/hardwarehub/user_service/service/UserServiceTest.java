@@ -58,7 +58,7 @@ public class UserServiceTest
     void setUp()
     {
         Authentication authentication = new UsernamePasswordAuthenticationToken(
-                "Lorenzosarlo",
+                "1",
                 null,
                 Collections.emptyList()
         );
@@ -76,12 +76,12 @@ public class UserServiceTest
     void getMe_whenCurrentUserExists_thenReturnUser()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
 
         UserEntity admin = UserFactory.admin();
         UserResponseDTO adminDTO = UserFactory.adminDTO();
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(admin));
         when(userMapper.entityToDTO(admin)).thenReturn(adminDTO);
 
         // When
@@ -95,15 +95,15 @@ public class UserServiceTest
     void getMe_whenCurrentUserDoesNotExist_thenThrowUsernameNotFoundException()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         // When
         assertThrows(UsernameNotFoundException.class, () -> userService.getMe());
 
         // Then
-        verify(userRepository).findByUsername(username);
+        verify(userRepository).findById(userId);
         verifyNoMoreInteractions(userRepository);
     }
 
@@ -288,7 +288,7 @@ public class UserServiceTest
     void updateMe_whenUsernameAndEmailAreAvailable_thenUpdateAndReturnUser()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
 
         UserEntity admin = UserFactory.admin();
         UserEntity adminUpdated = UserFactory.adminUpdated();
@@ -301,7 +301,7 @@ public class UserServiceTest
                 "Viviani"
         );
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(admin));
         when(userRepository.existsByUsername(requestDTO.username())).thenReturn(false);
         when(userRepository.existsByEmail(requestDTO.email())).thenReturn(false);
 
@@ -320,7 +320,10 @@ public class UserServiceTest
     void updateMe_whenUsernameIsAlreadyTaken_thenThrowUsernameAlreadyExistsException()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("2", null, Collections.emptyList())
+        );
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
 
         UserEntity user = UserFactory.customer();
 
@@ -331,14 +334,14 @@ public class UserServiceTest
                 null
         );
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(userRepository.existsByUsername("TakenUser")).thenReturn(true);
 
         // When
         assertThrows(UsernameAlreadyExistsException.class, () -> userService.updateMe(requestDTO));
 
         // Then
-        verify(userRepository).findByUsername(username);
+        verify(userRepository).findById(userId);
         verify(userRepository).existsByUsername("TakenUser");
         verifyNoMoreInteractions(userRepository);
     }
@@ -347,7 +350,7 @@ public class UserServiceTest
     void updateMe_whenEmailIsAlreadyTaken_thenThrowEmailAlreadyExistsException()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
 
         UserEntity admin = UserFactory.admin();
 
@@ -358,14 +361,14 @@ public class UserServiceTest
                 null
         );
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(admin));
         when(userRepository.existsByEmail(requestDTO.email())).thenReturn(true);
 
         // When
         assertThrows(EmailAlreadyExistsException.class, () -> userService.updateMe(requestDTO));
 
         // Then
-        verify(userRepository).findByUsername(username);
+        verify(userRepository).findById(userId);
         verify(userRepository).existsByEmail(requestDTO.email());
         verifyNoMoreInteractions(userRepository);
     }
@@ -374,7 +377,7 @@ public class UserServiceTest
     void updateMe_whenOptionalFieldsAreNull_thenKeepCurrentValues()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
 
         UserEntity admin = UserFactory.admin();
         UserResponseDTO adminDTO = UserFactory.adminDTO();
@@ -386,7 +389,7 @@ public class UserServiceTest
                 null
         );
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(admin));
         when(userRepository.save(admin)).thenReturn(admin);
         when(userMapper.entityToDTO(admin)).thenReturn(adminDTO);
 
@@ -405,7 +408,7 @@ public class UserServiceTest
     void updateMe_whenCurrentUsernameAndEmailAreUnchanged_thenUpdateAndReturnUser()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
 
         UserEntity admin = UserFactory.admin();
         UserResponseDTO adminDTO = UserFactory.adminDTO();
@@ -417,7 +420,7 @@ public class UserServiceTest
                 admin.getLastName()
         );
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(admin));
         when(userRepository.save(admin)).thenReturn(admin);
         when(userMapper.entityToDTO(admin)).thenReturn(adminDTO);
 
@@ -433,8 +436,6 @@ public class UserServiceTest
     void updateById_whenUserIsNotAdmin_thenUpdateAndReturnUser()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-
         int id = 2;
         UserEntity user = UserFactory.customer();
 
@@ -614,7 +615,7 @@ public class UserServiceTest
     void changePassword_whenCurrentPasswordIsValidAndNewPasswordIsDifferent_thenSaveNewPassword()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
 
         UserEntity admin = UserFactory.admin();
         admin.setPassword("encodedCurrentPassword");
@@ -624,7 +625,7 @@ public class UserServiceTest
                 "NewPassword1!"
         );
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(admin));
         when(passwordEncoder.matches(requestDTO.currentPassword(), admin.getPassword())).thenReturn(true);
         when(passwordEncoder.matches(requestDTO.newPassword(), admin.getPassword())).thenReturn(false);
         when(passwordEncoder.encode(requestDTO.newPassword())).thenReturn("encodedNewPassword");
@@ -641,7 +642,7 @@ public class UserServiceTest
     void changePassword_whenCurrentPasswordIsInvalid_thenThrowInvalidCurrentPasswordException()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
 
         UserEntity admin = UserFactory.admin();
         admin.setPassword("encodedCurrentPassword");
@@ -651,14 +652,14 @@ public class UserServiceTest
                 "NewPassword1!"
         );
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(admin));
         when(passwordEncoder.matches(requestDTO.currentPassword(), admin.getPassword())).thenReturn(false);
 
         // When
         assertThrows(InvalidCurrentPasswordException.class, () -> userService.changePassword(requestDTO));
 
         // Then
-        verify(userRepository).findByUsername(username);
+        verify(userRepository).findById(userId);
         verifyNoMoreInteractions(userRepository);
         verify(passwordEncoder).matches(requestDTO.currentPassword(), admin.getPassword());
         verifyNoMoreInteractions(passwordEncoder);
@@ -668,21 +669,21 @@ public class UserServiceTest
     void changePassword_whenNewPasswordMatchesCurrentPassword_thenThrowPasswordReuseNotAllowedException()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
 
         UserEntity admin = UserFactory.admin();
         admin.setPassword("encodedCurrentPassword");
 
         PasswordUpdateRequestDTO requestDTO = new PasswordUpdateRequestDTO("Current1!", "Current1!");
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(admin));
         when(passwordEncoder.matches(requestDTO.currentPassword(), admin.getPassword())).thenReturn(true, true);
 
         // When
         assertThrows(PasswordReuseNotAllowedException.class, () -> userService.changePassword(requestDTO));
 
         // Then
-        verify(userRepository).findByUsername(username);
+        verify(userRepository).findById(userId);
         verifyNoMoreInteractions(userRepository);
         verify(passwordEncoder, times(2)).matches("Current1!", admin.getPassword());
         verifyNoMoreInteractions(passwordEncoder);
@@ -692,16 +693,16 @@ public class UserServiceTest
     void changePassword_whenCurrentUserDoesNotExist_thenThrowUsernameNotFoundException()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
         PasswordUpdateRequestDTO requestDTO = new PasswordUpdateRequestDTO("Current1!", "NewPassword1!");
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         // When
         assertThrows(UsernameNotFoundException.class, () -> userService.changePassword(requestDTO));
 
         // Then
-        verify(userRepository).findByUsername(username);
+        verify(userRepository).findById(userId);
         verifyNoMoreInteractions(userRepository);
         verifyNoInteractions(passwordEncoder);
     }
@@ -710,14 +711,14 @@ public class UserServiceTest
     void deleteMe_whenPasswordIsValid_thenDeleteCurrentUser()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
 
         UserEntity admin = UserFactory.admin();
         admin.setPassword("encodedCurrentPassword");
 
         PasswordRequestDTO requestDTO = new PasswordRequestDTO("Current1!");
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(admin));
         when(passwordEncoder.matches(requestDTO.password(), admin.getPassword())).thenReturn(true);
 
         // When
@@ -731,21 +732,21 @@ public class UserServiceTest
     void deleteMe_whenPasswordIsInvalid_thenThrowInvalidCurrentPasswordException()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
 
         UserEntity admin = UserFactory.admin();
         admin.setPassword("encodedCurrentPassword");
 
         PasswordRequestDTO requestDTO = new PasswordRequestDTO("WrongPass1!");
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(admin));
         when(passwordEncoder.matches(requestDTO.password(), admin.getPassword())).thenReturn(false);
 
         // When
         assertThrows(InvalidCurrentPasswordException.class, () -> userService.deleteMe(requestDTO));
 
         // Then
-        verify(userRepository).findByUsername(username);
+        verify(userRepository).findById(userId);
         verifyNoMoreInteractions(userRepository);
         verify(passwordEncoder).matches(requestDTO.password(), admin.getPassword());
         verifyNoMoreInteractions(passwordEncoder);
@@ -755,17 +756,17 @@ public class UserServiceTest
     void deleteMe_whenCurrentUserDoesNotExist_thenThrowUsernameNotFoundException()
     {
         // Given
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
 
         PasswordRequestDTO requestDTO = new PasswordRequestDTO("Current1!");
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         // When
         assertThrows(UsernameNotFoundException.class, () -> userService.deleteMe(requestDTO));
 
         // Then
-        verify(userRepository).findByUsername(username);
+        verify(userRepository).findById(userId);
         verifyNoMoreInteractions(userRepository);
         verifyNoInteractions(passwordEncoder);
     }

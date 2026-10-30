@@ -177,11 +177,9 @@ public class UserService
 
     private UserEntity findCurrentUserOrThrow()
     {
-        // Throws an exception if the user doesn't exist or is an admin.
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        int userId = Integer.parseInt(SecurityContextHolder.getContext().getAuthentication().getName());
 
-        return userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found."));
+        return findByIdOrThrow(userId);
     }
 
     private UserEntity findByIdOrThrow(int id)

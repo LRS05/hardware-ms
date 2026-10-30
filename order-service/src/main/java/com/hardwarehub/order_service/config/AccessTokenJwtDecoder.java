@@ -3,6 +3,7 @@ package com.hardwarehub.order_service.config;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -53,6 +54,18 @@ public class AccessTokenJwtDecoder implements JwtDecoder
         if (!"ACCESS".equals(type))
         {
             throw new JwtException("Invalid token type.");
+        }
+
+        try
+        {
+            if (Integer.parseInt(jwt.getSubject()) <= 0)
+            {
+                throw new BadJwtException("Invalid JWT subject.");
+            }
+        }
+        catch (NumberFormatException e)
+        {
+            throw new BadJwtException("Invalid JWT subject.", e);
         }
 
         return jwt;

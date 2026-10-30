@@ -113,7 +113,6 @@ public class OrderController
 
     private Integer getUserId(Jwt jwt)
     {
-        Number userId = jwt.getClaim("userId");
-        return userId.intValue();
+        return Integer.parseInt(jwt.getSubject());
     }
 }
