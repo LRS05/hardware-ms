@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -84,18 +85,20 @@ public class ProductService
     }
 
     // Only non-null and non-empty fields from the DTO will be updated.
+    @Transactional
     public ProductResponseDTO updateById(int id, ProductUpdateRequestDTO requestDTO)
     {
-        ProductEntity product = findByIdOrThrow(id);
+        ProductEntity product = findByIdForUpdateOrThrow(id);
 
         updateProduct(product, requestDTO);
 
         return productMapper.entityToDTO(productRepository.save(product));
     }
 
+    @Transactional
     public void increaseStockById(int id, StockRequestDTO requestDTO)
     {
-        ProductEntity product = findByIdOrThrow(id);
+        ProductEntity product = findByIdForUpdateOrThrow(id);
 
         product.setStock(product.getStock() + requestDTO.stock());
 
@@ -104,9 +107,10 @@ public class ProductService
         productRepository.save(product);
     }
 
+    @Transactional
     public void decreaseStockById(int id, StockRequestDTO requestDTO)
     {
-        ProductEntity product = findByIdOrThrow(id);
+        ProductEntity product = findByIdForUpdateOrThrow(id);
 
         validateStock(product, requestDTO.stock());
 
@@ -117,9 +121,10 @@ public class ProductService
         productRepository.save(product);
     }
 
+    @Transactional
     public void deactivateById(int id)
     {
-        ProductEntity product = findByIdOrThrow(id);
+        ProductEntity product = findByIdForUpdateOrThrow(id);
 
         product.setStatus(ProductStatus.INACTIVE);
 
@@ -131,6 +136,12 @@ public class ProductService
     private ProductEntity findByIdOrThrow(int id)
     {
         return productRepository.findById(id)
+                .orElseThrow(() -> new ProductNotFoundException("Product not found."));
+    }
+
+    private ProductEntity findByIdForUpdateOrThrow(int id)
+    {
+        return productRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ProductNotFoundException("Product not found."));
     }
 

@@ -36,7 +36,7 @@ public class OrderService
     @Transactional(noRollbackFor = EmptyOrderException.class)
     public OrderResponseDTO checkout(int userId)
     {
-        OrderEntity order = findActiveOrderOrThrow(userId);
+        OrderEntity order = findActiveOrderForUpdateOrThrow(userId);
 
         refreshOrderAndItemsPrice(order);
 
@@ -53,7 +53,7 @@ public class OrderService
     @Transactional
     public void complete(int userId)
     {
-        OrderEntity order = findPendingOrderOrThrow(userId);
+        OrderEntity order = findPendingOrderForUpdateOrThrow(userId);
 
         order.setStatus(OrderStatus.COMPLETED);
     }
@@ -61,7 +61,7 @@ public class OrderService
     @Transactional
     public OrderResponseDTO reopen(int userId)
     {
-        OrderEntity order = findPendingOrderOrThrow(userId);
+        OrderEntity order = findPendingOrderForUpdateOrThrow(userId);
 
         releaseProductStock(order);
 
@@ -73,7 +73,7 @@ public class OrderService
     @Transactional
     public void refreshActiveOrder(int userId)
     {
-        OrderEntity order = findActiveOrderOrThrow(userId);
+        OrderEntity order = findActiveOrderForUpdateOrThrow(userId);
 
         refreshOrderAndItemsPrice(order);
     }
@@ -81,7 +81,7 @@ public class OrderService
     @Transactional
     public void clearActiveOrder(int userId)
     {
-        OrderEntity order = findActiveOrderOrThrow(userId);
+        OrderEntity order = findActiveOrderForUpdateOrThrow(userId);
 
         for (OrderItemEntity item : new ArrayList<>(order.getOrderItems()))
         {
@@ -175,6 +175,7 @@ public class OrderService
     @Transactional
     public void deleteItemById(int itemId, int userId)
     {
+        // Blocks the original order
         OrderItemEntity item = findActiveItemByIdAndUserId(itemId, userId);
 
         OrderEntity order = item.getOrder();
@@ -292,12 +293,15 @@ public class OrderService
             throw new PendingOrderExistsException("You have a pending order.");
         }
 
-        return orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)
+        return orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())
                 .orElseGet(() -> orderRepository.save(buildOrder(userId)));
     }
 
     private OrderItemEntity findActiveItemByIdAndUserId(int id, int userId)
     {
+        orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())
+                .orElseThrow(() -> new ItemNotFoundException("Item not found."));
+
         return orderItemRepository.findActiveItemByIdAndUserId(id, userId)
                 .orElseThrow(() -> new ItemNotFoundException("Item not found."));
     }
@@ -310,9 +314,15 @@ public class OrderService
         }
     }
 
-    private OrderEntity findActiveOrderOrThrow(int userId)
+    private OrderEntity findActiveOrderForUpdateOrThrow(int userId)
     {
-        return orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)
+        return orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())
                 .orElseThrow(() -> new EmptyOrderException("Order is empty."));
+    }
+
+    private OrderEntity findPendingOrderForUpdateOrThrow(int userId)
+    {
+        return orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name())
+                .orElseThrow(() -> new OrderNotFoundException("Pending order not found."));
     }
 }

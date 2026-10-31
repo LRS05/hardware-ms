@@ -4,6 +4,7 @@ import com.hardwarehub.order_service.dto.ErrorResponseDTO;
 import com.hardwarehub.order_service.enums.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -84,6 +85,16 @@ public class GlobalExceptionHandler
         e.getFieldErrors().forEach(error -> fieldMessages.put(error.getField(), error.getDefaultMessage()));
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(fieldMessages);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponseDTO> handleDataIntegrityViolationException(DataIntegrityViolationException e)
+    {
+        return sendErrorResponse(
+                HttpStatus.CONFLICT,
+                ApiError.DATA_INTEGRITY_VIOLATION,
+                "The operation conflicts with the current order data."
+        );
     }
 
     private ResponseEntity<ErrorResponseDTO> sendErrorResponse(HttpStatus status, ApiError error, String message)
