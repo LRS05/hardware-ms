@@ -3,6 +3,7 @@ package com.hardwarehub.api_gateway.security;
 import com.hardwarehub.api_gateway.jwt.AccessTokenJwtDecoder;
 import com.hardwarehub.api_gateway.jwt.JwtPropagationFilterSupplier;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -46,6 +47,8 @@ public class SecurityConfig
     {
         return request ->
         {
+            if (shouldSkipAccessToken(request)) return null;
+
             if (request.getCookies() == null) return null;
 
             return Arrays.stream(request.getCookies())
@@ -54,6 +57,29 @@ public class SecurityConfig
                     .map(Cookie::getValue)
                     .orElse(null);
         };
+    }
+
+    private boolean shouldSkipAccessToken(HttpServletRequest request)
+    {
+        String method = request.getMethod();
+        String path = request.getServletPath();
+
+        if ("POST".equals(method)
+                && (path.equals("/api/v1/auth/login")
+                    || path.equals("/api/v1/auth/register")
+                    || path.equals("/api/v1/auth/refresh")))
+        {
+            return true;
+        }
+
+        if ("GET".equals(method)
+                && (path.equals("/api/v1/products")
+                    || path.startsWith("/api/v1/products/")))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     @Bean
