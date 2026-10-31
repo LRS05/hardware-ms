@@ -5,11 +5,15 @@ import com.hardwarehub.user_service.dto.AuthRequestDTO;
 import com.hardwarehub.user_service.dto.RegisterRequestDTO;
 import com.hardwarehub.user_service.entity.UserEntity;
 import com.hardwarehub.user_service.enums.ApiError;
+import com.hardwarehub.user_service.enums.TokenType;
 import com.hardwarehub.user_service.factory.UserFactory;
 import com.hardwarehub.user_service.service.JwtService;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -19,7 +23,18 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.web.servlet.client.EntityExchangeResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
+
+import java.net.HttpCookie;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Date;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
@@ -34,6 +49,9 @@ class AuthControllerTest
     private int port;
 
     private RestTestClient restTestClient;
+
+    @Value("${jwt.secret-key}")
+    private String jwtSecret;
 
     @Autowired
     private JwtService jwtService;
@@ -244,6 +262,115 @@ class AuthControllerTest
     }
 
     @Test
+    void refresh_whenAccessTokenIsExpiredAndRefreshTokenIsValid_thenReturnNewAccessCookie()
+    {
+        UserEntity user = UserFactory.customer();
+        user.setUsername("marceloviviani");
+
+        String expiredAccessToken = createExpiredToken(TokenType.ACCESS);
+        ResponseCookie refreshTokenCookie = jwtService.generateRefreshTokenCookie(user);
+
+        EntityExchangeResult<Void> result = restTestClient.post()
+                .uri("/refresh")
+                .header(HttpHeaders.COOKIE, "access-token=" + expiredAccessToken
+                        + "; refresh-token=" + refreshTokenCookie.getValue())
+                .exchange()
+                .expectStatus().isNoContent()
+                .expectHeader().valuesMatch(HttpHeaders.SET_COOKIE, "access-token=[^;]+;.*")
+                .expectBody().isEmpty();
+
+        String setCookie = result.getResponseHeaders().getFirst(HttpHeaders.SET_COOKIE);
+        assertNotNull(setCookie);
+
+        HttpCookie accessCookie = HttpCookie.parse(setCookie).get(0);
+        String newAccessToken = accessCookie.getValue();
+
+        assertEquals("access-token", accessCookie.getName());
+        assertNotEquals(expiredAccessToken, newAccessToken);
+        assertTrue(jwtService.isValid(newAccessToken, user));
+        assertEquals("ACCESS", jwtService.getType(newAccessToken));
+        assertEquals(user.getId(), jwtService.getUserId(newAccessToken));
+    }
+
+    @Test
+    void refresh_whenRefreshTokenIsExpired_thenReturnUnauthorizedWithoutCookies()
+    {
+        String expiredAccessToken = createExpiredToken(TokenType.ACCESS);
+        String expiredRefreshToken = createExpiredToken(TokenType.REFRESH);
+
+        restTestClient.post()
+                .uri("/refresh")
+                .header(HttpHeaders.COOKIE, "access-token=" + expiredAccessToken
+                        + "; refresh-token=" + expiredRefreshToken)
+                .exchange()
+                .expectStatus().isUnauthorized()
+                .expectHeader().doesNotExist(HttpHeaders.SET_COOKIE)
+                .expectBody()
+                .jsonPath("$.error").isEqualTo(ApiError.INVALID_JWT.name());
+    }
+
+    @Test
+    void refresh_whenRefreshTokenIsInvalid_thenReturnUnauthorizedWithoutCookies()
+    {
+        String expiredAccessToken = createExpiredToken(TokenType.ACCESS);
+
+        restTestClient.post()
+                .uri("/refresh")
+                .header(HttpHeaders.COOKIE, "access-token=" + expiredAccessToken + "; refresh-token=invalid-token")
+                .exchange()
+                .expectStatus().isUnauthorized()
+                .expectHeader().doesNotExist(HttpHeaders.SET_COOKIE)
+                .expectBody()
+                .jsonPath("$.error").isEqualTo(ApiError.INVALID_JWT.name());
+    }
+
+    @Test
+    void login_whenAccessTokenCookieIsExpiredAndCredentialsAreValid_thenReturnCookies()
+    {
+        AuthRequestDTO requestDTO = new AuthRequestDTO("marceloviviani", "Gordomono8!");
+        String expiredAccessToken = createExpiredToken(TokenType.ACCESS);
+
+        restTestClient.post()
+                .uri("/login")
+                .header(HttpHeaders.COOKIE, "access-token=" + expiredAccessToken)
+                .body(requestDTO)
+                .exchange()
+                .expectStatus().isNoContent()
+                .expectHeader().valuesMatch(
+                        HttpHeaders.SET_COOKIE,
+                        "access-token=[^;]+;.*",
+                        "refresh-token=[^;]+;.*"
+                )
+                .expectBody().isEmpty();
+    }
+
+    @Test
+    void register_whenAccessTokenCookieIsExpiredAndDataIsValid_thenCreateCustomerAndReturnCookies()
+    {
+        RegisterRequestDTO requestDTO = new RegisterRequestDTO(
+                "alfredo@gmail.com",
+                "alfredoviviani",
+                "Gordomono8!",
+                "Alfredo",
+                "Viviani"
+        );
+        String expiredAccessToken = createExpiredToken(TokenType.ACCESS);
+
+        restTestClient.post()
+                .uri("/register")
+                .header(HttpHeaders.COOKIE, "access-token=" + expiredAccessToken)
+                .body(requestDTO)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectHeader().valuesMatch(
+                        HttpHeaders.SET_COOKIE,
+                        "access-token=[^;]+;.*",
+                        "refresh-token=[^;]+;.*"
+                )
+                .expectBody().isEmpty();
+    }
+
+    @Test
     void logout_whenUserIsAuthenticated_thenReturnEmptyCookies()
     {
         UserEntity user = UserFactory.customer();
@@ -281,5 +408,20 @@ class AuthControllerTest
                 .header(HttpHeaders.AUTHORIZATION, "Bearer INVALID_TOKEN")
                 .exchange()
                 .expectStatus().isUnauthorized();
+    }
+
+    private String createExpiredToken(TokenType type)
+    {
+        Instant now = Instant.now();
+
+        return Jwts.builder()
+                .subject("2")
+                .claim("username", "marceloviviani")
+                .claim("role", "CUSTOMER")
+                .claim("type", type.name())
+                .issuedAt(Date.from(now.minusSeconds(1800)))
+                .expiration(Date.from(now.minusSeconds(900)))
+                .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
+                .compact();
     }
 }

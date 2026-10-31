@@ -3,7 +3,6 @@ package com.hardwarehub.product_service.controller;
 import com.hardwarehub.product_service.config.PostgresTestConfig;
 import com.hardwarehub.product_service.dto.ProductRequestDTO;
 import com.hardwarehub.product_service.dto.ProductUpdateRequestDTO;
-import com.hardwarehub.product_service.dto.StockRequestDTO;
 import com.hardwarehub.product_service.enums.ApiError;
 import com.hardwarehub.product_service.enums.Category;
 import com.hardwarehub.product_service.enums.ProductStatus;
@@ -26,10 +25,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
-import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import javax.crypto.spec.SecretKeySpec;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
@@ -102,6 +101,21 @@ public class ProductControllerTest
     void getLatestUpdatedProducts_whenProductsExist_thenReturnProductPage()
     {
         restTestClient.get()
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.content.length()").isEqualTo(2)
+                .jsonPath("$.totalElements").isEqualTo(2)
+                .jsonPath("$.size").isEqualTo(20);
+    }
+
+    @Test
+    void getLatestUpdatedProducts_whenRequestIsUnauthenticated_thenReturnProductPage()
+    {
+        RestTestClient unauthenticatedClient = createRestTestClientForRole(null);
+
+        unauthenticatedClient.get()
+                .uri("")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -196,6 +210,21 @@ public class ProductControllerTest
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.id").isEqualTo(productId)
+                .jsonPath("$.sku").isEqualTo("GV-N108T GAMING-OC-11G")
+                .jsonPath("$.name").isEqualTo("NVIDIA GTX 1080 TI");
+    }
+
+    @Test
+    void getProductById_whenRequestIsUnauthenticated_thenReturnProduct()
+    {
+        RestTestClient unauthenticatedClient = createRestTestClientForRole(null);
+
+        unauthenticatedClient.get()
+                .uri("/{id}", 1)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(1)
                 .jsonPath("$.sku").isEqualTo("GV-N108T GAMING-OC-11G")
                 .jsonPath("$.name").isEqualTo("NVIDIA GTX 1080 TI");
     }
@@ -406,48 +435,6 @@ public class ProductControllerTest
                 .isEqualTo("Product with id " + productId + " successfully deactivated.");
     }
 
-    @Test
-    void decreaseStockById_whenEnoughStockExists_thenReturnNoContent()
-    {
-        int productId = 1;
-        StockRequestDTO requestDTO = new StockRequestDTO(10);
-
-        adminRestTestClient.patch()
-                .uri("/{id}/decrease", productId)
-                .body(requestDTO)
-                .exchange()
-                .expectStatus().isNoContent();
-    }
-
-    @Test
-    void decreaseStockById_whenStockIsInsufficient_thenReturnConflict()
-    {
-        int productId = 1;
-        StockRequestDTO requestDTO = new StockRequestDTO(51);
-
-        adminRestTestClient.patch()
-                .uri("/{id}/decrease", productId)
-                .body(requestDTO)
-                .exchange()
-                .expectStatus().isEqualTo(HttpStatus.CONFLICT)
-                .expectBody()
-                .jsonPath("$.error").isEqualTo(ApiError.INSUFFICIENT_STOCK.name())
-                .jsonPath("$.message").isEqualTo("There's not enough stock of this product.");
-    }
-
-    @Test
-    void increaseStockById_whenRequestIsValid_thenReturnNoContent()
-    {
-        int productId = 1;
-        StockRequestDTO requestDTO = new StockRequestDTO(10);
-
-        staffRestTestClient.patch()
-                .uri("/{id}/increase", productId)
-                .body(requestDTO)
-                .exchange()
-                .expectStatus().isNoContent();
-    }
-
     // Authorization tests
 
     @Test
@@ -489,6 +476,7 @@ public class ProductControllerTest
                 .exchange()
                 .expectStatus().isForbidden();
     }
+
     @Test
     void createProduct_whenInvalidToken_thenReturnUnauthorized()
     {

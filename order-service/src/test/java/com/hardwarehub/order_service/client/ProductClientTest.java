@@ -3,18 +3,20 @@ package com.hardwarehub.order_service.client;
 import com.hardwarehub.order_service.client.dto.ProductResponseDTO;
 import com.hardwarehub.order_service.exception.ProductNotFoundException;
 import com.hardwarehub.order_service.exception.ProductOutOfStockException;
+import com.hardwarehub.order_service.factory.ProductFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -26,8 +28,13 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+@SpringJUnitConfig
+@TestPropertySource(locations = "classpath:application-test.properties")
 public class ProductClientTest
 {
+    @Value("${internal.auth.api-key}")
+    private String apiKey;
+
     private ProductClient productClient;
 
     private MockRestServiceServer server;
@@ -37,46 +44,35 @@ public class ProductClientTest
     {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        productClient = new ProductClient(builder, "apiKey");
+        productClient = new ProductClient(builder, apiKey);
     }
 
     @Test
     void getById_whenProductServiceReturnsProduct_thenReturnProduct()
     {
         int productId = 1;
-        String responseBody = """
-                {
-                    "id": 1,
-                    "status": "AVAILABLE",
-                    "category": "GRAPHIC_CARD",
-                    "sku": "GPU-1080-TI",
-                    "name": "NVIDIA GTX 1080-TI",
-                    "description": "Graphics card",
-                    "price": 2000.00,
-                    "stock": 10,
-                    "created_at": "2026-10-23T10:05:00",
-                    "updated_at": "2026-10-24T11:30:00"
-                }
-                """;
+        ProductResponseDTO expectedProduct = ProductFactory.availableGraphicCardDTO();
+
+        String responseBody = JsonMapper.builder().build().writeValueAsString(expectedProduct);
 
         server.expect(requestTo("http://product-service/internal/products/" + productId))
                 .andExpect(method(HttpMethod.GET))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().string(""))
                 .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         ProductResponseDTO product = productClient.getById(productId);
 
-        assertEquals(productId, product.id());
-        assertEquals("AVAILABLE", product.status());
-        assertEquals("GRAPHIC_CARD", product.category());
-        assertEquals("GPU-1080-TI", product.sku());
-        assertEquals("NVIDIA GTX 1080-TI", product.name());
-        assertEquals("Graphics card", product.description());
-        assertEquals(new BigDecimal("2000.00"), product.price());
-        assertEquals(10, product.stock());
-        assertEquals(LocalDateTime.of(2026, 10, 23, 10, 5), product.createdAt());
-        assertEquals(LocalDateTime.of(2026, 10, 24, 11, 30), product.updatedAt());
+        assertEquals(expectedProduct.id(), product.id());
+        assertEquals(expectedProduct.status(), product.status());
+        assertEquals(expectedProduct.category(), product.category());
+        assertEquals(expectedProduct.sku(), product.sku());
+        assertEquals(expectedProduct.name(), product.name());
+        assertEquals(expectedProduct.description(), product.description());
+        assertEquals(expectedProduct.price(), product.price());
+        assertEquals(expectedProduct.stock(), product.stock());
+        assertEquals(expectedProduct.createdAt(), product.createdAt());
+        assertEquals(expectedProduct.updatedAt(), product.updatedAt());
 
         server.verify();
     }
@@ -88,7 +84,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId))
                 .andExpect(method(HttpMethod.GET))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().string(""))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
@@ -106,7 +102,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId))
                 .andExpect(method(HttpMethod.GET))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().string(""))
                 .andRespond(withStatus(HttpStatus.CONFLICT));
 
@@ -124,7 +120,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId))
                 .andExpect(method(HttpMethod.GET))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().string(""))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
@@ -141,7 +137,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId + "/decrease"))
                 .andExpect(method(HttpMethod.PATCH))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withNoContent());
@@ -159,7 +155,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId + "/decrease"))
                 .andExpect(method(HttpMethod.PATCH))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
@@ -179,7 +175,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId + "/decrease"))
                 .andExpect(method(HttpMethod.PATCH))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.CONFLICT));
@@ -199,7 +195,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId + "/decrease"))
                 .andExpect(method(HttpMethod.PATCH))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
@@ -217,7 +213,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId + "/increase"))
                 .andExpect(method(HttpMethod.PATCH))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withNoContent());
@@ -235,7 +231,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId + "/increase"))
                 .andExpect(method(HttpMethod.PATCH))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
@@ -255,7 +251,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId + "/increase"))
                 .andExpect(method(HttpMethod.PATCH))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.CONFLICT));
@@ -275,7 +271,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId + "/increase"))
                 .andExpect(method(HttpMethod.PATCH))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
@@ -292,7 +288,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId))
                 .andExpect(method(HttpMethod.GET))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().string(""))
                 .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
 
@@ -308,7 +304,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId))
                 .andExpect(method(HttpMethod.GET))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().string(""))
                 .andRespond(withStatus(HttpStatus.FORBIDDEN));
 
@@ -325,7 +321,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId + "/decrease"))
                 .andExpect(method(HttpMethod.PATCH))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
@@ -343,7 +339,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId + "/decrease"))
                 .andExpect(method(HttpMethod.PATCH))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.FORBIDDEN));
@@ -361,7 +357,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId + "/increase"))
                 .andExpect(method(HttpMethod.PATCH))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
@@ -379,7 +375,7 @@ public class ProductClientTest
 
         server.expect(requestTo("http://product-service/internal/products/" + productId + "/increase"))
                 .andExpect(method(HttpMethod.PATCH))
-                .andExpect(header("X-API-Key", "apiKey"))
+                .andExpect(header("X-API-Key", apiKey))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.FORBIDDEN));

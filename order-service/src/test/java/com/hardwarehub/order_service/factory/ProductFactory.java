@@ -33,6 +33,22 @@ public class ProductFactory
         );
     }
 
+    public static ProductResponseDTO availableGraphicCardDTO()
+    {
+        return new ProductResponseDTO(
+                1,
+                "AVAILABLE",
+                "GRAPHIC_CARD",
+                "GPU-1080-TI",
+                "NVIDIA GTX 1080-TI",
+                "Graphics card",
+                new BigDecimal("2000.00"),
+                10,
+                LocalDateTime.of(2026, 10, 23, 10, 5),
+                LocalDateTime.of(2026, 10, 24, 11, 30)
+        );
+    }
+
     public static ProductResponseDTO processorDTO()
     {
         return new ProductResponseDTO(
