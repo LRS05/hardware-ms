@@ -33,7 +33,7 @@ public class ProductEntity
     @Column(unique = true, nullable = false)
     private String sku;
 
-    @Column(nullable = false)
+    @Column(unique = true, nullable = false)
     private String name;
 
     @Column(length = 300)

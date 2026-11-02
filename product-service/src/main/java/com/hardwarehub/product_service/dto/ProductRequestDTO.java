@@ -22,7 +22,7 @@ public record ProductRequestDTO(
         String sku,
 
         @NotBlank(message = "Name is required.")
-        @Size(max = 150, message = "Name must not exceed 150 characters.")
+        @Size(max = 64, message = "Name must not exceed 64 characters.")
         String name,
 
         @NotBlank(message = "Description is required.")

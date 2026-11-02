@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -305,7 +304,6 @@ public class ProductServiceTest
         Category category = Category.PROCESSOR;
         Pageable pageable = PageRequest.of(0, 10);
 
-
         when(productRepository.findAllByCategoryAndStatus(category, ProductStatus.ACTIVE, pageable)).thenReturn(Page.empty(pageable));
 
         // When
@@ -449,6 +447,69 @@ public class ProductServiceTest
         // Then
         verify(productRepository).findByIdForUpdate(id);
         verifyNoMoreInteractions(productRepository);
+        verifyNoInteractions(productMapper);
+    }
+
+    @Test
+    void updateById_whenNameAlreadyExists_thenThrowProductNameAlreadyExistsException()
+    {
+        // Given
+        int id = 1;
+        ProductEntity product = ProductFactory.graphicCard();
+        ProductUpdateRequestDTO requestDTO = new ProductUpdateRequestDTO(
+                null,
+                null,
+                null,
+                "Intel Core i3-4170",
+                null,
+                null,
+                null
+        );
+
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
+        when(productRepository.existsByNameAndIdNot(requestDTO.name(), id)).thenReturn(true);
+
+        // When
+        assertThrows(ProductNameAlreadyExistsException.class, () -> productService.updateById(id, requestDTO));
+
+        // Then
+        assertEquals("NVIDIA GTX 1080 TI", product.getName());
+
+        verify(productRepository).existsByNameAndIdNot(requestDTO.name(), id);
+        verify(productRepository, never()).save(any(ProductEntity.class));
+        verifyNoInteractions(productMapper);
+    }
+
+    @Test
+    void updateById_whenSkuAlreadyExists_thenThrowProductSkuAlreadyExistsException()
+    {
+        // Given
+        int id = 1;
+        ProductEntity product = ProductFactory.graphicCard();
+        ProductUpdateRequestDTO requestDTO = new ProductUpdateRequestDTO(
+                null,
+                null,
+                "77490",
+                null,
+                null,
+                null,
+                null
+        );
+
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
+        when(productRepository.existsBySkuAndIdNot(requestDTO.sku(), id)).thenReturn(true);
+
+        // When
+        assertThrows(
+                ProductSkuAlreadyExistsException.class,
+                () -> productService.updateById(id, requestDTO)
+        );
+
+        // Then
+        assertEquals("GV-N108T GAMING-OC-11G", product.getSku());
+
+        verify(productRepository).existsBySkuAndIdNot(requestDTO.sku(), id);
+        verify(productRepository, never()).save(any(ProductEntity.class));
         verifyNoInteractions(productMapper);
     }
 

@@ -90,6 +90,8 @@ public class ProductService
     {
         ProductEntity product = findByIdForUpdateOrThrow(id);
 
+        validateNameOrSkuAreAvailableForUpdate(id, requestDTO.name(), requestDTO.sku());
+
         updateProduct(product, requestDTO);
 
         return productMapper.entityToDTO(productRepository.save(product));
@@ -199,6 +201,19 @@ public class ProductService
         if (requestDTO.stock() != null)
         {
             product.setStock(requestDTO.stock());
+        }
+    }
+
+    private void validateNameOrSkuAreAvailableForUpdate(int id, String name, String sku)
+    {
+        if (name != null && productRepository.existsByNameAndIdNot(name, id))
+        {
+            throw new ProductNameAlreadyExistsException("Name already exists.");
+        }
+
+        if (sku != null && productRepository.existsBySkuAndIdNot(sku, id))
+        {
+            throw new ProductSkuAlreadyExistsException("SKU already exists.");
         }
     }
 

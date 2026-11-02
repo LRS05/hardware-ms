@@ -32,4 +32,8 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Integer>
             nativeQuery = true
     )
     Optional<ProductEntity> findByIdForUpdate(@Param("id") int id);
+
+    boolean existsByNameAndIdNot(String name, int id);
+
+    boolean existsBySkuAndIdNot(String sku, int id);
 }
