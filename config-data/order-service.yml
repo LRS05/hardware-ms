@@ -31,3 +31,8 @@ jwt:
 internal:
   auth:
     api-key: ${ORDER_SERVICE_API_KEY}
+  clients:
+    payment-service:
+      apikey: ${PAYMENT_SERVICE_API_KEY}
+      permissions:
+        - ORDER_COMPLETE

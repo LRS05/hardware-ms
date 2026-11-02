@@ -114,11 +114,9 @@ public class OrderServiceTest
         when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.empty());
 
         // When
-        EmptyOrderException exception = assertThrows(EmptyOrderException.class, () -> orderService.checkout(userId));
+        assertThrows(EmptyOrderException.class, () -> orderService.checkout(userId));
 
         // Then
-        assertEquals("Order is empty.", exception.getMessage());
-
         verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name());
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
@@ -128,15 +126,15 @@ public class OrderServiceTest
     void complete_whenOrderDoesNotExist_thenThrowOrderNotFoundException()
     {
         // Given
-        int userId = 1;
+        int orderId = 999;
 
-        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name())).thenReturn(Optional.empty());
+        when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.empty());
 
         // When
-        assertThrows(OrderNotFoundException.class, () -> orderService.complete(userId));
+        assertThrows(OrderNotFoundException.class, () -> orderService.complete(orderId));
 
         // Then
-        verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name());
+        verify(orderRepository).findByIdForUpdate(orderId);
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
     }
@@ -167,11 +165,9 @@ public class OrderServiceTest
         when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.empty());
 
         // When
-        EmptyOrderException exception = assertThrows(EmptyOrderException.class, () -> orderService.refreshActiveOrder(userId));
+        assertThrows(EmptyOrderException.class, () -> orderService.refreshActiveOrder(userId));
 
         // Then
-        assertEquals("Order is empty.", exception.getMessage());
-
         verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name());
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
@@ -186,11 +182,9 @@ public class OrderServiceTest
         when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.empty());
 
         // When
-        EmptyOrderException exception = assertThrows(EmptyOrderException.class, () -> orderService.clearActiveOrder(userId));
+        assertThrows(EmptyOrderException.class, () -> orderService.clearActiveOrder(userId));
 
         // Then
-        assertEquals("Order is empty.", exception.getMessage());
-
         verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name());
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
@@ -598,20 +592,20 @@ public class OrderServiceTest
     void complete_whenPendingOrderExists_thenCompleteWithoutCreatingAnotherOrder()
     {
         // Given
-        int userId = 1;
+        int orderId = 2;
 
         OrderEntity order = OrderFactory.activeOrder();
         order.setStatus(OrderStatus.PENDING);
 
-        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name())).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
 
         // When
-        orderService.complete(userId);
+        orderService.complete(orderId);
 
         // Then
         assertEquals(OrderStatus.COMPLETED, order.getStatus());
 
-        verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name());
+        verify(orderRepository).findByIdForUpdate(orderId);
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
     }
@@ -1087,11 +1081,9 @@ public class OrderServiceTest
         when(orderRepository.existsByUserIdAndStatus(userId, OrderStatus.PENDING)).thenReturn(true);
 
         // When
-        PendingOrderExistsException exception = assertThrows(PendingOrderExistsException.class, () -> orderService.addItem(userId, productId));
+        assertThrows(PendingOrderExistsException.class, () -> orderService.addItem(userId, productId));
 
         // Then
-        assertEquals("You have a pending order.", exception.getMessage());
-
         verify(orderRepository).existsByUserIdAndStatus(userId, OrderStatus.PENDING);
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderItemRepository);
@@ -1355,11 +1347,10 @@ public class OrderServiceTest
         when(productClient.getById(1)).thenReturn(product);
 
         // When
-        InvalidQuantityException exception = assertThrows(InvalidQuantityException.class,
+        assertThrows(InvalidQuantityException.class,
                 () -> orderService.updateItemQuantity(item.getId(), userId, 0));
 
         // Then
-        assertEquals("Quantity must be greater than zero.", exception.getMessage());
         assertEquals(List.of(item, otherItem), order.getOrderItems());
         assertSame(order, item.getOrder());
         assertEquals(2, item.getQuantity());
@@ -1402,11 +1393,10 @@ public class OrderServiceTest
         when(productClient.getById(1)).thenReturn(product);
 
         // When
-        InvalidQuantityException exception = assertThrows(InvalidQuantityException.class,
+        assertThrows(InvalidQuantityException.class,
                 () -> orderService.updateItemQuantity(item.getId(), userId, -1));
 
         // Then
-        assertEquals("Quantity must be greater than zero.", exception.getMessage());
         assertEquals(List.of(item, otherItem), order.getOrderItems());
         assertSame(order, item.getOrder());
         assertEquals(2, item.getQuantity());

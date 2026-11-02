@@ -34,8 +34,11 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Integer>
             value = "SELECT * FROM orders WHERE user_id = :userId AND status = :status FOR UPDATE",
             nativeQuery = true
     )
-    Optional<OrderEntity> findByUserIdAndStatusForUpdate(
-            @Param("userId") int userId,
-            @Param("status") String status
-    );
+    Optional<OrderEntity> findByUserIdAndStatusForUpdate(@Param("userId") int userId, @Param("status") String status);
+
+    @Query(
+            value = "SELECT * FROM orders WHERE id = :id FOR UPDATE",
+            nativeQuery = true
+    )
+    Optional<OrderEntity> findByIdForUpdate(@Param("id") int id);
 }

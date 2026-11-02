@@ -49,11 +49,22 @@ public class OrderService
         return orderMapper.entityToDTO(orderRepository.save(order));
     }
 
-    // Only used when a user completes a purchase.
+    // Only used internally when a user completes a purchase.
     @Transactional
-    public void complete(int userId)
+    public void complete(int orderId)
     {
-        OrderEntity order = findPendingOrderForUpdateOrThrow(userId);
+        OrderEntity order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found."));
+
+        if (order.getStatus() == OrderStatus.COMPLETED)
+        {
+            return;
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING)
+        {
+            throw new InvalidOrderStatusException("Only pending orders can be completed.");
+        }
 
         order.setStatus(OrderStatus.COMPLETED);
     }

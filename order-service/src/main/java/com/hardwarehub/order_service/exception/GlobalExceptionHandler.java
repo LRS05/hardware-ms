@@ -65,6 +65,12 @@ public class GlobalExceptionHandler
         return sendErrorResponse(HttpStatus.CONFLICT, ApiError.PENDING_ORDER_ALREADY_EXISTS, e.getMessage());
     }
 
+    @ExceptionHandler(InvalidOrderStatusException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvalidOrderStatusException(InvalidOrderStatusException e)
+    {
+        return sendErrorResponse(HttpStatus.CONFLICT, ApiError.INVALID_ORDER_STATUS, e.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponseDTO> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e)
     {
