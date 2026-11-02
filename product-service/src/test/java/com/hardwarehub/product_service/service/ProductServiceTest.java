@@ -369,7 +369,7 @@ public class ProductServiceTest
                 75
         );
 
-        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
         when(productRepository.save(product)).thenReturn(product);
         when(productMapper.entityToDTO(product)).thenReturn(productDTO);
 
@@ -406,7 +406,7 @@ public class ProductServiceTest
         );
         ProductResponseDTO productDTO = ProductFactory.graphicCardDTO();
 
-        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
         when(productRepository.save(product)).thenReturn(product);
         when(productMapper.entityToDTO(product)).thenReturn(productDTO);
 
@@ -441,13 +441,13 @@ public class ProductServiceTest
                 null
         );
 
-        when(productRepository.findById(id)).thenReturn(Optional.empty());
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.empty());
 
         // When
         assertThrows(ProductNotFoundException.class, () -> productService.updateById(id, requestDTO));
 
         // Then
-        verify(productRepository).findById(id);
+        verify(productRepository).findByIdForUpdate(id);
         verifyNoMoreInteractions(productRepository);
         verifyNoInteractions(productMapper);
     }
@@ -460,7 +460,7 @@ public class ProductServiceTest
         ProductEntity product = ProductFactory.graphicCard();
         StockRequestDTO requestDTO = new StockRequestDTO(25);
 
-        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
 
         // When
         productService.increaseStockById(id, requestDTO);
@@ -482,7 +482,7 @@ public class ProductServiceTest
         product.setStatus(ProductStatus.INACTIVE);
         StockRequestDTO requestDTO = new StockRequestDTO(25);
 
-        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
 
         // When
         productService.increaseStockById(id, requestDTO);
@@ -501,13 +501,13 @@ public class ProductServiceTest
         // Given
         int id = 999;
         StockRequestDTO requestDTO = new StockRequestDTO(25);
-        when(productRepository.findById(id)).thenReturn(Optional.empty());
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.empty());
 
         // When
         assertThrows(ProductNotFoundException.class, () -> productService.increaseStockById(id, requestDTO));
 
         // Then
-        verify(productRepository).findById(id);
+        verify(productRepository).findByIdForUpdate(id);
         verifyNoMoreInteractions(productRepository);
     }
 
@@ -519,7 +519,7 @@ public class ProductServiceTest
         ProductEntity product = ProductFactory.graphicCard();
         StockRequestDTO requestDTO = new StockRequestDTO(10);
 
-        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
 
         // When
         productService.decreaseStockById(id, requestDTO);
@@ -542,7 +542,7 @@ public class ProductServiceTest
         product.setStock(10);
         StockRequestDTO requestDTO = new StockRequestDTO(10);
 
-        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
 
         // When
         productService.decreaseStockById(id, requestDTO);
@@ -565,13 +565,13 @@ public class ProductServiceTest
         product.setStatus(ProductStatus.INACTIVE);
         StockRequestDTO requestDTO = new StockRequestDTO(10);
 
-        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
 
         // When
         assertThrows(ProductOutOfStockException.class, () -> productService.decreaseStockById(id, requestDTO));
 
         // Then
-        verify(productRepository).findById(id);
+        verify(productRepository).findByIdForUpdate(id);
         verifyNoMoreInteractions(productRepository);
     }
 
@@ -583,13 +583,13 @@ public class ProductServiceTest
         ProductEntity product = ProductFactory.graphicCard();
         StockRequestDTO requestDTO = new StockRequestDTO(51);
 
-        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
 
         // When
         assertThrows(InsufficientStockException.class, () -> productService.decreaseStockById(id, requestDTO));
 
         // Then
-        verify(productRepository).findById(id);
+        verify(productRepository).findByIdForUpdate(id);
         verifyNoMoreInteractions(productRepository);
     }
 
@@ -599,13 +599,13 @@ public class ProductServiceTest
         // Given
         int id = 999;
         StockRequestDTO requestDTO = new StockRequestDTO(10);
-        when(productRepository.findById(id)).thenReturn(Optional.empty());
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.empty());
 
         // When
         assertThrows(ProductNotFoundException.class, () -> productService.decreaseStockById(id, requestDTO));
 
         // Then
-        verify(productRepository).findById(id);
+        verify(productRepository).findByIdForUpdate(id);
         verifyNoMoreInteractions(productRepository);
     }
 
@@ -615,7 +615,7 @@ public class ProductServiceTest
         // Given
         int id = 1;
         ProductEntity product = ProductFactory.graphicCard();
-        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
 
         // When
         productService.deactivateById(id);
@@ -632,13 +632,13 @@ public class ProductServiceTest
     {
         // Given
         int id = 999;
-        when(productRepository.findById(id)).thenReturn(Optional.empty());
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.empty());
 
         // When
         assertThrows(ProductNotFoundException.class, () -> productService.deactivateById(id));
 
         // Then
-        verify(productRepository).findById(id);
+        verify(productRepository).findByIdForUpdate(id);
         verifyNoMoreInteractions(productRepository);
     }
 }
