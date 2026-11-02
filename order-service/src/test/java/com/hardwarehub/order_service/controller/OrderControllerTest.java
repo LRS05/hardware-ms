@@ -30,8 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import javax.crypto.spec.SecretKeySpec;
 
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient

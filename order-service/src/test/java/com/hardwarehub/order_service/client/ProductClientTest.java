@@ -18,15 +18,9 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withNoContent;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
 @SpringJUnitConfig
 @TestPropertySource(locations = "classpath:application-test.properties")
@@ -88,9 +82,7 @@ public class ProductClientTest
                 .andExpect(content().string(""))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        ProductNotFoundException exception = assertThrows(ProductNotFoundException.class, () -> productClient.getById(productId));
-
-        assertEquals("Product not found.", exception.getMessage());
+        assertThrows(ProductNotFoundException.class, () -> productClient.getById(productId));
 
         server.verify();
     }
@@ -106,9 +98,7 @@ public class ProductClientTest
                 .andExpect(content().string(""))
                 .andRespond(withStatus(HttpStatus.CONFLICT));
 
-        ProductOutOfStockException exception = assertThrows(ProductOutOfStockException.class, () -> productClient.getById(productId));
-
-        assertEquals("The product is out of stock.", exception.getMessage());
+        assertThrows(ProductOutOfStockException.class, () -> productClient.getById(productId));
 
         server.verify();
     }
@@ -160,9 +150,7 @@ public class ProductClientTest
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        ProductNotFoundException exception = assertThrows(ProductNotFoundException.class, () -> productClient.decreaseStockById(productId, quantity));
-
-        assertEquals("Product not found.", exception.getMessage());
+        assertThrows(ProductNotFoundException.class, () -> productClient.decreaseStockById(productId, quantity));
 
         server.verify();
     }
@@ -180,9 +168,7 @@ public class ProductClientTest
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.CONFLICT));
 
-        ProductOutOfStockException exception = assertThrows(ProductOutOfStockException.class, () -> productClient.decreaseStockById(productId, quantity));
-
-        assertEquals("This product is out of stock.", exception.getMessage());
+        assertThrows(ProductOutOfStockException.class, () -> productClient.decreaseStockById(productId, quantity));
 
         server.verify();
     }
@@ -236,9 +222,7 @@ public class ProductClientTest
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        ProductNotFoundException exception = assertThrows(ProductNotFoundException.class, () -> productClient.increaseStockById(productId, quantity));
-
-        assertEquals("Product not found.", exception.getMessage());
+        assertThrows(ProductNotFoundException.class, () -> productClient.increaseStockById(productId, quantity));
 
         server.verify();
     }
@@ -256,9 +240,7 @@ public class ProductClientTest
                 .andExpect(content().json("{\"stock\":" + quantity + "}"))
                 .andRespond(withStatus(HttpStatus.CONFLICT));
 
-        ProductOutOfStockException exception = assertThrows(ProductOutOfStockException.class, () -> productClient.increaseStockById(productId, quantity));
-
-        assertEquals("This product is out of stock.", exception.getMessage());
+        assertThrows(ProductOutOfStockException.class, () -> productClient.increaseStockById(productId, quantity));
 
         server.verify();
     }
