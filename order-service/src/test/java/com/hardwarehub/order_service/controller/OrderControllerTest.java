@@ -11,7 +11,6 @@ import com.hardwarehub.order_service.factory.ProductFactory;
 import com.hardwarehub.order_service.repository.OrderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Nested;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
@@ -550,180 +549,139 @@ public class OrderControllerTest
                 .jsonPath("$.order_items[0].quantity").isEqualTo(2);
     }
 
-    @Nested
-    class LimitedStock
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void addItemToOrder_whenIncrementExceedsStock_thenReturnConflict()
     {
-        @BeforeEach
-        void setUpProductClient()
-        {
-            ProductResponseDTO product = ProductFactory.graphicCardDTO(2);
+        ProductResponseDTO product = ProductFactory.graphicCardDTO(2);
 
-            when(productClient.getById(product.id())).thenReturn(product);
-        }
+        when(productClient.getById(product.id())).thenReturn(product);
 
-        @Test
-        @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
-        void addItemToOrder_whenIncrementExceedsStock_thenReturnConflict()
-        {
-            int productId = 1;
+        int productId = 1;
 
-            customerRestTestClient.patch()
-                    .uri("/active/items/products/{productId}", productId)
-                    .exchange()
-                    .expectStatus().isEqualTo(409)
-                    .expectBody()
-                    .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_OUT_OF_STOCK.name())
-                    .jsonPath("$.message").isEqualTo("Only 2 units are available.");
-        }
+        customerRestTestClient.patch()
+                .uri("/active/items/products/{productId}", productId)
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_OUT_OF_STOCK.name())
+                .jsonPath("$.message").isEqualTo("Only 2 units are available.");
     }
 
-    @Nested
-    class ChangedPrice
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void refresh_whenProductPriceChanges_thenReturnNoContent()
     {
-        @BeforeEach
-        void setUpProductClient()
-        {
-            ProductResponseDTO product = ProductFactory.graphicCardDTO(10, 1500);
+        ProductResponseDTO product = ProductFactory.graphicCardDTO(10, 1500);
 
-            when(productClient.getById(product.id())).thenReturn(product);
-        }
+        when(productClient.getById(product.id())).thenReturn(product);
 
-        @Test
-        @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
-        void refresh_whenProductPriceChanges_thenReturnNoContent()
-        {
-            customerRestTestClient.patch()
-                    .uri("/active/refresh")
-                    .exchange()
-                    .expectStatus().isNoContent();
-        }
-
-        @Test
-        @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
-        void checkout_whenOrderHasItems_thenReturnOrderWithUpdatedPrices()
-        {
-            customerRestTestClient.patch()
-                    .uri("/active/checkout")
-                    .exchange()
-                    .expectStatus().isOk()
-                    .expectBody()
-                    .jsonPath("$.id").isEqualTo(2)
-                    .jsonPath("$.total_price").isEqualTo(3000)
-                    .jsonPath("$.order_items[0].quantity").isEqualTo(2);
-        }
+        customerRestTestClient.patch()
+                .uri("/active/refresh")
+                .exchange()
+                .expectStatus().isNoContent();
     }
 
-    @Nested
-    class ReducedStock
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void checkout_whenOrderHasItems_thenReturnOrderWithUpdatedPrices()
     {
-        @BeforeEach
-        void setUpProductClient()
-        {
-            ProductResponseDTO product = ProductFactory.graphicCardDTO(1);
+        ProductResponseDTO product = ProductFactory.graphicCardDTO(10, 1500);
 
-            when(productClient.getById(product.id())).thenReturn(product);
-        }
+        when(productClient.getById(product.id())).thenReturn(product);
 
-        @Test
-        @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
-        void refresh_whenQuantityExceedsStock_thenReturnNoContent()
-        {
-            customerRestTestClient.patch()
-                    .uri("/active/refresh")
-                    .exchange()
-                    .expectStatus().isNoContent();
-        }
+        customerRestTestClient.patch()
+                .uri("/active/checkout")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(2)
+                .jsonPath("$.total_price").isEqualTo(3000)
+                .jsonPath("$.order_items[0].quantity").isEqualTo(2);
     }
 
-    @Nested
-    class MissingProduct
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void refresh_whenQuantityExceedsStock_thenReturnNoContent()
     {
-        @BeforeEach
-        void setUpProductClient()
-        {
-            when(productClient.getById(1)).thenThrow(new ProductNotFoundException("Product not found."));
-        }
+        ProductResponseDTO product = ProductFactory.graphicCardDTO(1);
 
-        @Test
-        @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
-        void refresh_whenProductDoesNotExist_thenReturnNoContent()
-        {
-            int productId = 2;
+        when(productClient.getById(product.id())).thenReturn(product);
 
-            customerRestTestClient.patch()
-                    .uri("/active/items/products/{productId}", productId)
-                    .exchange()
-                    .expectStatus().isNoContent();
-
-            customerRestTestClient.patch()
-                    .uri("/active/refresh")
-                    .exchange()
-                    .expectStatus().isNoContent();
-        }
-
-        @Test
-        @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
-        void checkout_whenAllProductsAreRemoved_thenReturnBadRequest()
-        {
-            customerRestTestClient.patch()
-                    .uri("/active/checkout")
-                    .exchange()
-                    .expectStatus().isBadRequest()
-                    .expectBody()
-                    .jsonPath("$.error").isEqualTo(ApiError.EMPTY_ORDER.name())
-                    .jsonPath("$.message").isEqualTo("Order is empty.");
-        }
+        customerRestTestClient.patch()
+                .uri("/active/refresh")
+                .exchange()
+                .expectStatus().isNoContent();
     }
 
-    @Nested
-    class OutOfStockProduct
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void refresh_whenProductDoesNotExist_thenReturnNoContent()
     {
-        @BeforeEach
-        void setUpProductClient()
-        {
-            when(productClient.getById(1)).thenThrow(new ProductOutOfStockException("Product unavailable."));
-        }
+        when(productClient.getById(1)).thenThrow(new ProductNotFoundException("Product not found."));
 
-        @Test
-        @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
-        void refresh_whenProductHasNoStock_thenReturnNoContent()
-        {
-            int productId = 2;
+        int productId = 2;
 
-            customerRestTestClient.patch()
-                    .uri("/active/items/products/{productId}", productId)
-                    .exchange()
-                    .expectStatus().isNoContent();
+        customerRestTestClient.patch()
+                .uri("/active/items/products/{productId}", productId)
+                .exchange()
+                .expectStatus().isNoContent();
 
-            customerRestTestClient.patch()
-                    .uri("/active/refresh")
-                    .exchange()
-                    .expectStatus().isNoContent();
-        }
+        customerRestTestClient.patch()
+                .uri("/active/refresh")
+                .exchange()
+                .expectStatus().isNoContent();
     }
 
-    @Nested
-    class StockReservationFailure
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void checkout_whenAllProductsAreRemoved_thenReturnBadRequest()
     {
-        @BeforeEach
-        void setUpProductClient()
-        {
-            doThrow(new ProductOutOfStockException("Insufficient stock.")).when(productClient).decreaseStockById(1, 2);
-        }
+        when(productClient.getById(1)).thenThrow(new ProductNotFoundException("Product not found."));
 
-        @Test
-        @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
-        void checkout_whenStockReservationFails_thenReturnConflict()
-        {
-            customerRestTestClient.patch()
-                    .uri("/active/checkout")
-                    .exchange()
-                    .expectStatus().isEqualTo(409)
-                    .expectBody()
-                    .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_OUT_OF_STOCK.name())
-                    .jsonPath("$.message").isEqualTo("Insufficient stock.");
-        }
+        customerRestTestClient.patch()
+                .uri("/active/checkout")
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.error").isEqualTo(ApiError.EMPTY_ORDER.name())
+                .jsonPath("$.message").isEqualTo("Order is empty.");
     }
+
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void refresh_whenProductHasNoStock_thenReturnNoContent()
+    {
+        when(productClient.getById(1)).thenThrow(new ProductOutOfStockException("Product unavailable."));
+
+        int productId = 2;
+
+        customerRestTestClient.patch()
+                .uri("/active/items/products/{productId}", productId)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        customerRestTestClient.patch()
+                .uri("/active/refresh")
+                .exchange()
+                .expectStatus().isNoContent();
+    }
+
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void checkout_whenStockReservationFails_thenReturnConflict()
+    {
+        doThrow(new ProductOutOfStockException("Insufficient stock.")).when(productClient).decreaseStockById(1, 2);
+
+        customerRestTestClient.patch()
+                .uri("/active/checkout")
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_OUT_OF_STOCK.name())
+                .jsonPath("$.message").isEqualTo("Insufficient stock.");
+    }
+
     @Test
     void accessOrderEndpoints_whenUnauthenticated_thenReturnUnauthorized()
     {
