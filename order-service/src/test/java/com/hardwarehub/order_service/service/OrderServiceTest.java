@@ -111,7 +111,7 @@ public class OrderServiceTest
         // Given
         int userId = 1;
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.empty());
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.empty());
 
         // When
         EmptyOrderException exception = assertThrows(EmptyOrderException.class, () -> orderService.checkout(userId));
@@ -119,7 +119,7 @@ public class OrderServiceTest
         // Then
         assertEquals("Order is empty.", exception.getMessage());
 
-        verify(orderRepository).findByUserIdAndStatus(userId, OrderStatus.ACTIVE);
+        verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name());
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
     }
@@ -130,13 +130,13 @@ public class OrderServiceTest
         // Given
         int userId = 1;
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.PENDING)).thenReturn(Optional.empty());
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name())).thenReturn(Optional.empty());
 
         // When
         assertThrows(OrderNotFoundException.class, () -> orderService.complete(userId));
 
         // Then
-        verify(orderRepository).findByUserIdAndStatus(userId, OrderStatus.PENDING);
+        verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name());
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
     }
@@ -147,13 +147,13 @@ public class OrderServiceTest
         // Given
         int userId = 1;
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.PENDING)).thenReturn(Optional.empty());
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name())).thenReturn(Optional.empty());
 
         // When
         assertThrows(OrderNotFoundException.class, () -> orderService.reopen(userId));
 
         // Then
-        verify(orderRepository).findByUserIdAndStatus(userId, OrderStatus.PENDING);
+        verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name());
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
     }
@@ -164,7 +164,7 @@ public class OrderServiceTest
         // Given
         int userId = 1;
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.empty());
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.empty());
 
         // When
         EmptyOrderException exception = assertThrows(EmptyOrderException.class, () -> orderService.refreshActiveOrder(userId));
@@ -172,7 +172,7 @@ public class OrderServiceTest
         // Then
         assertEquals("Order is empty.", exception.getMessage());
 
-        verify(orderRepository).findByUserIdAndStatus(userId, OrderStatus.ACTIVE);
+        verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name());
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
     }
@@ -183,7 +183,7 @@ public class OrderServiceTest
         // Given
         int userId = 1;
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.empty());
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.empty());
 
         // When
         EmptyOrderException exception = assertThrows(EmptyOrderException.class, () -> orderService.clearActiveOrder(userId));
@@ -191,7 +191,7 @@ public class OrderServiceTest
         // Then
         assertEquals("Order is empty.", exception.getMessage());
 
-        verify(orderRepository).findByUserIdAndStatus(userId, OrderStatus.ACTIVE);
+        verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name());
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
     }
@@ -492,7 +492,7 @@ public class OrderServiceTest
         );
         OrderResponseDTO orderDTO = OrderFactory.activeOrderDTO();
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(productClient.getById(item.getProductId())).thenReturn(product);
         when(orderRepository.save(order)).thenReturn(order);
         when(orderMapper.entityToDTO(order)).thenReturn(orderDTO);
@@ -520,7 +520,7 @@ public class OrderServiceTest
         OrderEntity order = OrderFactory.activeOrder();
         order.getOrderItems().clear();
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
 
         // When
         assertThrows(EmptyOrderException.class, () -> orderService.checkout(userId));
@@ -544,7 +544,7 @@ public class OrderServiceTest
         OrderEntity order = OrderFactory.activeOrder();
 
         when(productClient.getById(1)).thenThrow(new ProductNotFoundException("Product not found."));
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
 
         // When
         assertThrows(EmptyOrderException.class, () -> orderService.checkout(userId));
@@ -580,7 +580,7 @@ public class OrderServiceTest
                 null
         );
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(productClient.getById(1)).thenReturn(product);
         doThrow(new ProductOutOfStockException("Insufficient stock.")).when(productClient).decreaseStockById(1, 2);
 
@@ -603,7 +603,7 @@ public class OrderServiceTest
         OrderEntity order = OrderFactory.activeOrder();
         order.setStatus(OrderStatus.PENDING);
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.PENDING)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name())).thenReturn(Optional.of(order));
 
         // When
         orderService.complete(userId);
@@ -611,7 +611,7 @@ public class OrderServiceTest
         // Then
         assertEquals(OrderStatus.COMPLETED, order.getStatus());
 
-        verify(orderRepository).findByUserIdAndStatus(userId, OrderStatus.PENDING);
+        verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name());
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
     }
@@ -627,7 +627,7 @@ public class OrderServiceTest
 
         OrderResponseDTO orderDTO = OrderFactory.activeOrderDTO();
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.PENDING)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name())).thenReturn(Optional.of(order));
         when(orderRepository.save(order)).thenReturn(order);
         when(orderMapper.entityToDTO(order)).thenReturn(orderDTO);
 
@@ -651,7 +651,7 @@ public class OrderServiceTest
         OrderEntity order = OrderFactory.activeOrder();
         order.setStatus(OrderStatus.PENDING);
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.PENDING)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name())).thenReturn(Optional.of(order));
         doThrow(new ProductNotFoundException("Product not found.")).when(productClient).increaseStockById(1, 2);
 
         // When
@@ -686,7 +686,7 @@ public class OrderServiceTest
                 null
         );
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(productClient.getById(1)).thenReturn(product);
 
         // When
@@ -722,7 +722,7 @@ public class OrderServiceTest
                 null
         );
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(productClient.getById(1)).thenReturn(product);
 
         // When
@@ -761,7 +761,7 @@ public class OrderServiceTest
                 null
         );
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(productClient.getById(1)).thenThrow(new ProductNotFoundException("Product unavailable."));
         when(productClient.getById(3)).thenReturn(product);
 
@@ -799,7 +799,7 @@ public class OrderServiceTest
                 null
         );
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(productClient.getById(1)).thenThrow(new ProductOutOfStockException("Product unavailable."));
         when(productClient.getById(3)).thenReturn(product);
 
@@ -821,7 +821,7 @@ public class OrderServiceTest
         OrderEntity order = OrderFactory.activeOrder();
         order.getOrderItems().clear();
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
 
         // When
         orderService.refreshActiveOrder(userId);
@@ -843,7 +843,7 @@ public class OrderServiceTest
         OrderItemEntity secondItem = OrderFactory.graphicCardOne();
         order.addItem(secondItem);
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
 
         // When
         orderService.clearActiveOrder(userId);
@@ -866,7 +866,7 @@ public class OrderServiceTest
         OrderEntity order = OrderFactory.activeOrder();
         order.getOrderItems().clear();
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
 
         // When
         orderService.clearActiveOrder(userId);
@@ -901,7 +901,8 @@ public class OrderServiceTest
                 null
         );
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.of(order));
+        when(orderRepository.existsByUserIdAndStatus(userId, OrderStatus.PENDING)).thenReturn(false);
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(productClient.getById(productId)).thenReturn(product);
         when(orderItemRepository.findByOrderIdAndProductId(order.getId(), productId)).thenReturn(Optional.empty());
 
@@ -947,7 +948,7 @@ public class OrderServiceTest
 
         OrderItemEntity item = order.getOrderItems().get(0);
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(productClient.getById(productId)).thenReturn(product);
         when(orderItemRepository.findByOrderIdAndProductId(order.getId(), productId)).thenReturn(Optional.of(item));
 
@@ -989,7 +990,7 @@ public class OrderServiceTest
                 null
         );
 
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.of(order));
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(productClient.getById(1)).thenReturn(product);
         when(orderItemRepository.findByOrderIdAndProductId(order.getId(), 1)).thenReturn(Optional.of(item));
 
@@ -1030,7 +1031,8 @@ public class OrderServiceTest
         );
 
         when(productClient.getById(productId)).thenReturn(product);
-        when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.ACTIVE)).thenReturn(Optional.empty());
+        when(orderRepository.existsByUserIdAndStatus(userId, OrderStatus.PENDING)).thenReturn(false);
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.empty());
         when(orderRepository.save(any(OrderEntity.class))).thenReturn(order);
         when(orderItemRepository.findByOrderIdAndProductId(order.getId(), productId)).thenReturn(Optional.empty());
 
@@ -1134,6 +1136,7 @@ public class OrderServiceTest
         OrderEntity order = OrderFactory.activeOrder();
         OrderItemEntity item = order.getOrderItems().get(0);
 
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(orderItemRepository.findActiveItemByIdAndUserId(item.getId(), userId)).thenReturn(Optional.of(item));
         when(productClient.getById(1)).thenThrow(new ProductNotFoundException("Product unavailable."));
 
@@ -1155,6 +1158,7 @@ public class OrderServiceTest
         OrderEntity order = OrderFactory.activeOrder();
         OrderItemEntity item = order.getOrderItems().get(0);
 
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(orderItemRepository.findActiveItemByIdAndUserId(item.getId(), userId)).thenReturn(Optional.of(item));
         when(productClient.getById(1)).thenThrow(new ProductOutOfStockException("Product unavailable."));
 
@@ -1192,6 +1196,7 @@ public class OrderServiceTest
                 null
         );
 
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(orderItemRepository.findActiveItemByIdAndUserId(item.getId(), userId)).thenReturn(Optional.of(item));
         when(productClient.getById(1)).thenReturn(product);
 
@@ -1230,6 +1235,7 @@ public class OrderServiceTest
                 null
         );
 
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(orderItemRepository.findActiveItemByIdAndUserId(item.getId(), userId)).thenReturn(Optional.of(item));
         when(productClient.getById(1)).thenReturn(product);
 
@@ -1268,6 +1274,7 @@ public class OrderServiceTest
                 null
         );
 
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(orderItemRepository.findActiveItemByIdAndUserId(item.getId(), userId)).thenReturn(Optional.of(item));
         when(productClient.getById(1)).thenReturn(product);
 
@@ -1306,6 +1313,7 @@ public class OrderServiceTest
                 null
         );
 
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(orderItemRepository.findActiveItemByIdAndUserId(item.getId(), userId)).thenReturn(Optional.of(item));
         when(productClient.getById(1)).thenReturn(product);
 
@@ -1342,6 +1350,7 @@ public class OrderServiceTest
                 null
         );
 
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(orderItemRepository.findActiveItemByIdAndUserId(item.getId(), userId)).thenReturn(Optional.of(item));
         when(productClient.getById(1)).thenReturn(product);
 
@@ -1357,10 +1366,10 @@ public class OrderServiceTest
         assertEquals(BigDecimal.valueOf(2000), item.getPrice());
         assertEquals(BigDecimal.valueOf(2000), order.getTotalPrice());
 
+        verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name());
         verify(orderItemRepository).findActiveItemByIdAndUserId(item.getId(), userId);
         verify(productClient).getById(1);
         verifyNoMoreInteractions(orderItemRepository, productClient);
-        verifyNoInteractions(orderRepository);
     }
 
     @Test
@@ -1388,6 +1397,7 @@ public class OrderServiceTest
                 null
         );
 
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(orderItemRepository.findActiveItemByIdAndUserId(item.getId(), userId)).thenReturn(Optional.of(item));
         when(productClient.getById(1)).thenReturn(product);
 
@@ -1403,10 +1413,10 @@ public class OrderServiceTest
         assertEquals(BigDecimal.valueOf(2000), item.getPrice());
         assertEquals(BigDecimal.valueOf(2000), order.getTotalPrice());
 
+        verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name());
         verify(orderItemRepository).findActiveItemByIdAndUserId(item.getId(), userId);
         verify(productClient).getById(1);
         verifyNoMoreInteractions(orderItemRepository, productClient);
-        verifyNoInteractions(orderRepository);
     }
 
     @Test
@@ -1416,15 +1426,17 @@ public class OrderServiceTest
         int userId = 1;
         int itemId = 999;
 
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(new OrderEntity()));
         when(orderItemRepository.findActiveItemByIdAndUserId(itemId, userId)).thenReturn(Optional.empty());
 
         // When
         assertThrows(ItemNotFoundException.class, () -> orderService.updateItemQuantity(itemId, userId, 3));
 
         // Then
+        verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name());
         verify(orderItemRepository).findActiveItemByIdAndUserId(itemId, userId);
         verifyNoMoreInteractions(orderItemRepository);
-        verifyNoInteractions(productClient, orderRepository);
+        verifyNoInteractions(productClient);
     }
 
     @Test
@@ -1434,6 +1446,7 @@ public class OrderServiceTest
         int userId = 1;
         int itemId = 999;
 
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(new OrderEntity()));
         when(orderItemRepository.findActiveItemByIdAndUserId(itemId, userId)).thenReturn(Optional.empty());
 
         // When
@@ -1442,7 +1455,7 @@ public class OrderServiceTest
         // Then
         verify(orderItemRepository).findActiveItemByIdAndUserId(itemId, userId);
         verifyNoMoreInteractions(orderItemRepository);
-        verifyNoInteractions(productClient, orderRepository);
+        verifyNoInteractions(productClient);
     }
 
     @Test
@@ -1456,6 +1469,7 @@ public class OrderServiceTest
         OrderItemEntity otherItem = OrderFactory.graphicCardOne();
         order.addItem(otherItem);
 
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(orderItemRepository.findActiveItemByIdAndUserId(item.getId(), userId)).thenReturn(Optional.of(item));
 
         // When
@@ -1478,6 +1492,7 @@ public class OrderServiceTest
         OrderEntity order = OrderFactory.activeOrder();
         OrderItemEntity item = order.getOrderItems().get(0);
 
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(orderItemRepository.findActiveItemByIdAndUserId(item.getId(), userId)).thenReturn(Optional.of(item));
 
         // When
