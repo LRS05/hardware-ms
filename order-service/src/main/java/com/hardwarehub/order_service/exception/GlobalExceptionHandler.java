@@ -96,11 +96,25 @@ public class GlobalExceptionHandler
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponseDTO> handleDataIntegrityViolationException(DataIntegrityViolationException e)
     {
-        return sendErrorResponse(
-                HttpStatus.CONFLICT,
-                ApiError.DATA_INTEGRITY_VIOLATION,
-                "The operation conflicts with the current order data."
-        );
+        return sendErrorResponse(HttpStatus.CONFLICT, ApiError.DATA_INTEGRITY_VIOLATION, "The operation conflicts with the current order data.");
+    }
+
+    @ExceptionHandler(ProductTimeoutException.class)
+    public ResponseEntity<ErrorResponseDTO> handleProductTimeoutException(ProductTimeoutException e)
+    {
+        return sendErrorResponse(HttpStatus.GATEWAY_TIMEOUT, ApiError.PRODUCT_TIMEOUT, "The product service did not respond in time.");
+    }
+
+    @ExceptionHandler(ProductUnavailableException.class)
+    public ResponseEntity<ErrorResponseDTO> handleProductUnavailableException(ProductUnavailableException e)
+    {
+        return sendErrorResponse(HttpStatus.SERVICE_UNAVAILABLE, ApiError.PRODUCT_UNAVAILABLE, "The product service is temporarily unavailable.");
+    }
+
+    @ExceptionHandler(ProductIntegrationException.class)
+    public ResponseEntity<ErrorResponseDTO> handleProductIntegrationException(ProductIntegrationException e)
+    {
+        return sendErrorResponse(HttpStatus.BAD_GATEWAY, ApiError.PRODUCT_INTEGRATION, "An error occurred while communicating with the product service.");
     }
 
     private ResponseEntity<ErrorResponseDTO> sendErrorResponse(HttpStatus status, ApiError error, String message)

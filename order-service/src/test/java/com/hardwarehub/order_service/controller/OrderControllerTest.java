@@ -5,8 +5,11 @@ import com.hardwarehub.order_service.client.dto.ProductResponseDTO;
 import com.hardwarehub.order_service.config.PostgresTestConfig;
 import com.hardwarehub.order_service.enums.ApiError;
 import com.hardwarehub.order_service.enums.OrderStatus;
+import com.hardwarehub.order_service.exception.ProductIntegrationException;
 import com.hardwarehub.order_service.exception.ProductNotFoundException;
 import com.hardwarehub.order_service.exception.ProductOutOfStockException;
+import com.hardwarehub.order_service.exception.ProductTimeoutException;
+import com.hardwarehub.order_service.exception.ProductUnavailableException;
 import com.hardwarehub.order_service.factory.ProductFactory;
 import com.hardwarehub.order_service.repository.OrderRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -798,5 +801,62 @@ public class OrderControllerTest
                 .expectBody()
                 .jsonPath("$.totalElements").isEqualTo(0)
                 .jsonPath("$.content.length()").isEqualTo(0);
+    }
+
+    @Test
+    void addItemToOrder_whenProductIntegrationFails_thenReturn502()
+    {
+        int productId = 1;
+
+        when(productClient.getById(productId)).thenThrow(new ProductIntegrationException("Internal dependency details"));
+
+        customerRestTestClient.patch()
+                .uri("/active/items/products/{productId}", productId)
+                .exchange()
+                .expectStatus().isEqualTo(502)
+                .expectBody()
+                .jsonPath("$.timestamp").exists()
+                .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_INTEGRATION.name())
+                .jsonPath("$.status").isEqualTo(502)
+                .jsonPath("$.path").isEqualTo("/api/v1/orders/active/items/products/" + productId)
+                .jsonPath("$.message").isEqualTo("An error occurred while communicating with the product service.");
+    }
+
+    @Test
+    void addItemToOrder_whenProductServiceIsUnavailable_thenReturn503()
+    {
+        int productId = 1;
+
+        when(productClient.getById(productId)).thenThrow(new ProductUnavailableException("Internal dependency details"));
+
+        customerRestTestClient.patch()
+                .uri("/active/items/products/{productId}", productId)
+                .exchange()
+                .expectStatus().isEqualTo(503)
+                .expectBody()
+                .jsonPath("$.timestamp").exists()
+                .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_UNAVAILABLE.name())
+                .jsonPath("$.status").isEqualTo(503)
+                .jsonPath("$.path").isEqualTo("/api/v1/orders/active/items/products/" + productId)
+                .jsonPath("$.message").isEqualTo("The product service is temporarily unavailable.");
+    }
+
+    @Test
+    void addItemToOrder_whenProductServiceTimesOut_thenReturn504()
+    {
+        int productId = 1;
+
+        when(productClient.getById(productId)).thenThrow(new ProductTimeoutException("Internal dependency details"));
+
+        customerRestTestClient.patch()
+                .uri("/active/items/products/{productId}", productId)
+                .exchange()
+                .expectStatus().isEqualTo(504)
+                .expectBody()
+                .jsonPath("$.timestamp").exists()
+                .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_TIMEOUT.name())
+                .jsonPath("$.status").isEqualTo(504)
+                .jsonPath("$.path").isEqualTo("/api/v1/orders/active/items/products/" + productId)
+                .jsonPath("$.message").isEqualTo("The product service did not respond in time.");
     }
 }
