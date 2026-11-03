@@ -18,6 +18,13 @@ spring:
               filters:
                 - JwtPropagation
 
+            - id: product-service-admin
+              uri: lb://product-service
+              predicates:
+                - Path=/api/v1/admin/products,/api/v1/admin/products/**
+              filters:
+                - JwtPropagation
+
             - id: user-service
               uri: lb://user-service
               predicates:

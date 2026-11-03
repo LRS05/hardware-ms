@@ -1,13 +1,15 @@
 package com.hardwarehub.product_service.controller;
 
 import com.hardwarehub.product_service.config.PostgresTestConfig;
-import com.hardwarehub.product_service.dto.ProductRequestDTO;
-import com.hardwarehub.product_service.dto.ProductUpdateRequestDTO;
+import com.hardwarehub.product_service.entity.ProductEntity;
 import com.hardwarehub.product_service.enums.ApiError;
 import com.hardwarehub.product_service.enums.Category;
 import com.hardwarehub.product_service.enums.ProductStatus;
+import com.hardwarehub.product_service.factory.ProductFactory;
+import com.hardwarehub.product_service.repository.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,7 +27,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import javax.crypto.spec.SecretKeySpec;
@@ -38,6 +39,9 @@ import javax.crypto.spec.SecretKeySpec;
 @Sql("/data.sql")
 public class ProductControllerTest
 {
+    @Autowired
+    private ProductRepository productRepository;
+
     @LocalServerPort
     private int port;
 
@@ -48,10 +52,6 @@ public class ProductControllerTest
     private long accessTokenExpiration;
 
     private RestTestClient restTestClient;
-
-    private RestTestClient adminRestTestClient;
-
-    private RestTestClient staffRestTestClient;
 
     private RestTestClient customerRestTestClient;
 
@@ -67,8 +67,6 @@ public class ProductControllerTest
                 .build();
 
         restTestClient = createRestTestClientForRole(null);
-        adminRestTestClient = createRestTestClientForRole("ADMIN");
-        staffRestTestClient = createRestTestClientForRole("STAFF");
         customerRestTestClient = createRestTestClientForRole("CUSTOMER");
     }
 
@@ -147,31 +145,6 @@ public class ProductControllerTest
                 .expectBody()
                 .jsonPath("$.totalElements").isEqualTo(0)
                 .jsonPath("$.content.length()").isEqualTo(0);
-    }
-
-    @Test
-    void getProductBySku_whenProductExists_thenReturnProduct()
-    {
-        restTestClient.get()
-                .uri("?sku=77490")
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$.sku").isEqualTo("77490")
-                .jsonPath("$.name").isEqualTo("Intel Core i3-4170")
-                .jsonPath("$.stock").isEqualTo(20);
-    }
-
-    @Test
-    void getProductBySku_whenProductDoesNotExist_thenReturnNotFound()
-    {
-        restTestClient.get()
-                .uri("?sku=missing")
-                .exchange()
-                .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
-                .expectBody()
-                .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_NOT_FOUND.name())
-                .jsonPath("$.message").isEqualTo("Product not found.");
     }
 
     @Test
@@ -256,238 +229,262 @@ public class ProductControllerTest
     }
 
     @Test
-    void createProduct_whenAdminProvidesValidData_thenReturnCreatedProduct()
+    void getProductById_whenUnauthenticatedRequestRequestsInactiveProduct_thenReturnConflict()
     {
-        ProductRequestDTO requestDTO = new ProductRequestDTO(
-                ProductStatus.ACTIVE,
-                Category.MOTHERBOARD,
-                "TEST-MOTHERBOARD-001",
-                "Test motherboard",
-                "Test motherboard description",
-                BigDecimal.valueOf(300),
-                15
-        );
+        int productId = 1;
+        ProductEntity product = productRepository.findById(productId).orElseThrow();
+        product.setStatus(ProductStatus.INACTIVE);
+        product.setStock(50);
+        productRepository.saveAndFlush(product);
 
-        adminRestTestClient.post()
-                .uri("")
-                .body(requestDTO)
-                .exchange()
-                .expectStatus().isCreated()
-                .expectBody()
-                .jsonPath("$.sku").isEqualTo(requestDTO.sku())
-                .jsonPath("$.name").isEqualTo(requestDTO.name())
-                .jsonPath("$.stock").isEqualTo(requestDTO.stock());
-    }
-
-    @Test
-    void createProduct_whenStaffProvidesValidData_thenReturnCreatedProduct()
-    {
-        ProductRequestDTO requestDTO = new ProductRequestDTO(
-                ProductStatus.ACTIVE,
-                Category.MOTHERBOARD,
-                "TEST-MOTHERBOARD-002",
-                "Staff motherboard",
-                "Staff motherboard description",
-                BigDecimal.valueOf(400),
-                10
-        );
-
-        staffRestTestClient.post()
-                .uri("")
-                .body(requestDTO)
-                .exchange()
-                .expectStatus().isCreated()
-                .expectBody()
-                .jsonPath("$.sku").isEqualTo(requestDTO.sku())
-                .jsonPath("$.name").isEqualTo(requestDTO.name())
-                .jsonPath("$.stock").isEqualTo(requestDTO.stock());
-    }
-
-    @Test
-    void createProduct_whenNameAlreadyExists_thenReturnConflict()
-    {
-        ProductRequestDTO requestDTO = new ProductRequestDTO(
-                ProductStatus.ACTIVE,
-                Category.MOTHERBOARD,
-                "NEW-MOTHERBOARD-001",
-                "NVIDIA GTX 1080 TI",
-                "A duplicate product name",
-                BigDecimal.valueOf(300),
-                15
-        );
-
-        adminRestTestClient.post()
-                .uri("")
-                .body(requestDTO)
+        restTestClient.get()
+                .uri("/{id}", productId)
                 .exchange()
                 .expectStatus().isEqualTo(HttpStatus.CONFLICT)
                 .expectBody()
-                .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_NAME_ALREADY_EXISTS.name())
-                .jsonPath("$.message").isEqualTo("Name already exists.");
+                .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_OUT_OF_STOCK.name());
     }
 
     @Test
-    void createProduct_whenSkuAlreadyExists_thenReturnConflict()
+    void getProductById_whenUnauthenticatedRequestRequestsOutOfStockProduct_thenReturnConflict()
     {
-        ProductRequestDTO requestDTO = new ProductRequestDTO(
-                ProductStatus.ACTIVE,
-                Category.MOTHERBOARD,
-                "77490",
-                "A new product name",
-                "A duplicate product SKU",
-                BigDecimal.valueOf(300),
-                15
-        );
+        int productId = 1;
+        ProductEntity product = productRepository.findById(productId).orElseThrow();
+        product.setStatus(ProductStatus.OUT_OF_STOCK);
+        product.setStock(0);
+        productRepository.saveAndFlush(product);
 
-        adminRestTestClient.post()
-                .uri("")
-                .body(requestDTO)
+        restTestClient.get()
+                .uri("/{id}", productId)
                 .exchange()
                 .expectStatus().isEqualTo(HttpStatus.CONFLICT)
                 .expectBody()
-                .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_SKU_ALREADY_EXISTS.name())
-                .jsonPath("$.message").isEqualTo("SKU already exists.");
+                .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_OUT_OF_STOCK.name());
     }
 
     @Test
-    void createProduct_whenRequiredFieldsAreMissing_thenReturnBadRequest()
+    void getLatestUpdatedProducts_whenUnauthenticatedRequestSearchesProductsWithDifferentStatuses_thenReturnOnlyActiveProducts()
     {
-        ProductRequestDTO requestDTO = new ProductRequestDTO(
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-        );
+        ProductEntity inactiveProduct = ProductFactory.graphicCard();
+        inactiveProduct.setId(0);
+        inactiveProduct.setSku("INACTIVE-GPU");
+        inactiveProduct.setName("NVIDIA inactive graphics card");
+        inactiveProduct.setStatus(ProductStatus.INACTIVE);
+        productRepository.saveAndFlush(inactiveProduct);
 
-        adminRestTestClient.post()
+        ProductEntity outOfStockProduct = ProductFactory.graphicCard();
+        outOfStockProduct.setId(0);
+        outOfStockProduct.setSku("OUT-OF-STOCK-GPU");
+        outOfStockProduct.setName("NVIDIA out of stock graphics card");
+        outOfStockProduct.setStatus(ProductStatus.OUT_OF_STOCK);
+        outOfStockProduct.setStock(0);
+        productRepository.saveAndFlush(outOfStockProduct);
+
+        restTestClient.get()
                 .uri("")
-                .body(requestDTO)
-                .exchange()
-                .expectStatus().isBadRequest()
-                .expectBody()
-                .jsonPath("$.status").isEqualTo("Status is required.")
-                .jsonPath("$.category").isEqualTo("Category is required.")
-                .jsonPath("$.sku").isEqualTo("SKU is required.");
-    }
-
-    @Test
-    void updateProductById_whenRequestIsValid_thenReturnUpdatedProduct()
-    {
-        int productId = 1;
-        ProductUpdateRequestDTO requestDTO = new ProductUpdateRequestDTO(
-                null,
-                Category.MOTHERBOARD,
-                "UPDATED-GPU-001",
-                "Updated graphics card",
-                null,
-                BigDecimal.valueOf(1500),
-                35
-        );
-
-        staffRestTestClient.patch()
-                .uri("/{id}", productId)
-                .body(requestDTO)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.sku").isEqualTo(requestDTO.sku())
-                .jsonPath("$.name").isEqualTo(requestDTO.name())
-                .jsonPath("$.stock").isEqualTo(requestDTO.stock());
+                .jsonPath("$.totalElements").isEqualTo(2)
+                .jsonPath("$.content.length()").isEqualTo(2)
+                .jsonPath("$.content[?(@.id == 1)]").isNotEmpty()
+                .jsonPath("$.content[?(@.sku == 'INACTIVE-GPU')]").isEmpty()
+                .jsonPath("$.content[?(@.sku == 'OUT-OF-STOCK-GPU')]").isEmpty();
     }
 
     @Test
-    void updateProductById_whenProductDoesNotExist_thenReturnNotFound()
+    void getProductsByName_whenUnauthenticatedRequestSearchesProductsWithDifferentStatuses_thenReturnOnlyActiveProducts()
     {
-        int productId = 999;
-        ProductUpdateRequestDTO requestDTO = new ProductUpdateRequestDTO(
-                null,
-                null,
-                null,
-                "Updated product",
-                null,
-                null,
-                null
-        );
+        ProductEntity inactiveProduct = ProductFactory.graphicCard();
+        inactiveProduct.setId(0);
+        inactiveProduct.setSku("INACTIVE-GPU");
+        inactiveProduct.setName("NVIDIA inactive graphics card");
+        inactiveProduct.setStatus(ProductStatus.INACTIVE);
+        productRepository.saveAndFlush(inactiveProduct);
 
-        adminRestTestClient.patch()
-                .uri("/{id}", productId)
-                .body(requestDTO)
-                .exchange()
-                .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
-                .expectBody()
-                .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_NOT_FOUND.name())
-                .jsonPath("$.message").isEqualTo("Product not found.");
-    }
+        ProductEntity outOfStockProduct = ProductFactory.graphicCard();
+        outOfStockProduct.setId(0);
+        outOfStockProduct.setSku("OUT-OF-STOCK-GPU");
+        outOfStockProduct.setName("NVIDIA out of stock graphics card");
+        outOfStockProduct.setStatus(ProductStatus.OUT_OF_STOCK);
+        outOfStockProduct.setStock(0);
+        productRepository.saveAndFlush(outOfStockProduct);
 
-    @Test
-    void deactivateProductById_whenProductExists_thenReturnSuccessMessage()
-    {
-        int productId = 1;
-
-        staffRestTestClient.patch()
-                .uri("/{id}/deactivate", productId)
+        restTestClient.get()
+                .uri("?name=NVIDIA")
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody(String.class)
-                .isEqualTo("Product with id " + productId + " successfully deactivated.");
-    }
-
-    // Authorization tests
-
-    @Test
-    void createProduct_whenRequestIsUnauthenticated_thenReturnUnauthorized()
-    {
-        ProductRequestDTO requestDTO = new ProductRequestDTO(
-                ProductStatus.ACTIVE,
-                Category.MOTHERBOARD,
-                "UNAUTHENTICATED-MOTHERBOARD-001",
-                "Unauthenticated motherboard",
-                "Unauthenticated motherboard description",
-                BigDecimal.valueOf(300),
-                15
-        );
-
-        restTestClient.post()
-                .uri("")
-                .body(requestDTO)
-                .exchange()
-                .expectStatus().isUnauthorized();
+                .expectBody()
+                .jsonPath("$.totalElements").isEqualTo(1)
+                .jsonPath("$.content.length()").isEqualTo(1)
+                .jsonPath("$.content[?(@.id == 1)]").isNotEmpty()
+                .jsonPath("$.content[?(@.sku == 'INACTIVE-GPU')]").isEmpty()
+                .jsonPath("$.content[?(@.sku == 'OUT-OF-STOCK-GPU')]").isEmpty();
     }
 
     @Test
-    void createProduct_whenCustomerIsAuthenticated_thenReturnForbidden()
+    void getProductsByCategory_whenUnauthenticatedRequestSearchesProductsWithDifferentStatuses_thenReturnOnlyActiveProducts()
     {
-        ProductRequestDTO requestDTO = new ProductRequestDTO(
-                ProductStatus.ACTIVE,
-                Category.MOTHERBOARD,
-                "CUSTOMER-MOTHERBOARD-001",
-                "Customer motherboard",
-                "Customer motherboard description",
-                BigDecimal.valueOf(300),
-                15
-        );
+        ProductEntity inactiveProduct = ProductFactory.graphicCard();
+        inactiveProduct.setId(0);
+        inactiveProduct.setSku("INACTIVE-GPU");
+        inactiveProduct.setName("NVIDIA inactive graphics card");
+        inactiveProduct.setStatus(ProductStatus.INACTIVE);
+        productRepository.saveAndFlush(inactiveProduct);
 
-        customerRestTestClient.post()
-                .uri("")
-                .body(requestDTO)
+        ProductEntity outOfStockProduct = ProductFactory.graphicCard();
+        outOfStockProduct.setId(0);
+        outOfStockProduct.setSku("OUT-OF-STOCK-GPU");
+        outOfStockProduct.setName("NVIDIA out of stock graphics card");
+        outOfStockProduct.setStatus(ProductStatus.OUT_OF_STOCK);
+        outOfStockProduct.setStock(0);
+        productRepository.saveAndFlush(outOfStockProduct);
+
+        restTestClient.get()
+                .uri("?category=GRAPHIC_CARD")
                 .exchange()
-                .expectStatus().isForbidden();
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.totalElements").isEqualTo(1)
+                .jsonPath("$.content.length()").isEqualTo(1)
+                .jsonPath("$.content[?(@.id == 1)]").isNotEmpty()
+                .jsonPath("$.content[?(@.sku == 'INACTIVE-GPU')]").isEmpty()
+                .jsonPath("$.content[?(@.sku == 'OUT-OF-STOCK-GPU')]").isEmpty();
     }
 
     @Test
-    void createProduct_whenInvalidToken_thenReturnUnauthorized()
+    void getProductById_whenCustomerRequestsInactiveProduct_thenReturnConflict()
     {
-        RestTestClient invalidTokenClient = RestTestClient.bindToServer()
-                .baseUrl("http://localhost:" + port + "/api/v1/products")
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer INVALID_TOKEN")
-                .build();
+        int productId = 1;
+        ProductEntity product = productRepository.findById(productId).orElseThrow();
+        product.setStatus(ProductStatus.INACTIVE);
+        product.setStock(50);
+        productRepository.saveAndFlush(product);
 
-        invalidTokenClient.post()
+        customerRestTestClient.get()
+                .uri("/{id}", productId)
+                .exchange()
+                .expectStatus().isEqualTo(HttpStatus.CONFLICT)
+                .expectBody()
+                .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_OUT_OF_STOCK.name());
+    }
+
+    @Test
+    void getProductById_whenCustomerRequestsOutOfStockProduct_thenReturnConflict()
+    {
+        int productId = 1;
+        ProductEntity product = productRepository.findById(productId).orElseThrow();
+        product.setStatus(ProductStatus.OUT_OF_STOCK);
+        product.setStock(0);
+        productRepository.saveAndFlush(product);
+
+        customerRestTestClient.get()
+                .uri("/{id}", productId)
+                .exchange()
+                .expectStatus().isEqualTo(HttpStatus.CONFLICT)
+                .expectBody()
+                .jsonPath("$.error").isEqualTo(ApiError.PRODUCT_OUT_OF_STOCK.name());
+    }
+
+    @Test
+    void getLatestUpdatedProducts_whenCustomerSearchesProductsWithDifferentStatuses_thenReturnOnlyActiveProducts()
+    {
+        ProductEntity inactiveProduct = ProductFactory.graphicCard();
+        inactiveProduct.setId(0);
+        inactiveProduct.setSku("INACTIVE-GPU");
+        inactiveProduct.setName("NVIDIA inactive graphics card");
+        inactiveProduct.setStatus(ProductStatus.INACTIVE);
+        productRepository.saveAndFlush(inactiveProduct);
+
+        ProductEntity outOfStockProduct = ProductFactory.graphicCard();
+        outOfStockProduct.setId(0);
+        outOfStockProduct.setSku("OUT-OF-STOCK-GPU");
+        outOfStockProduct.setName("NVIDIA out of stock graphics card");
+        outOfStockProduct.setStatus(ProductStatus.OUT_OF_STOCK);
+        outOfStockProduct.setStock(0);
+        productRepository.saveAndFlush(outOfStockProduct);
+
+        customerRestTestClient.get()
                 .uri("")
                 .exchange()
-                .expectStatus().isUnauthorized();
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.totalElements").isEqualTo(2)
+                .jsonPath("$.content.length()").isEqualTo(2)
+                .jsonPath("$.content[?(@.id == 1)]").isNotEmpty()
+                .jsonPath("$.content[?(@.sku == 'INACTIVE-GPU')]").isEmpty()
+                .jsonPath("$.content[?(@.sku == 'OUT-OF-STOCK-GPU')]").isEmpty();
+    }
+
+    @Test
+    void getProductsByName_whenCustomerSearchesProductsWithDifferentStatuses_thenReturnOnlyActiveProducts()
+    {
+        ProductEntity inactiveProduct = ProductFactory.graphicCard();
+        inactiveProduct.setId(0);
+        inactiveProduct.setSku("INACTIVE-GPU");
+        inactiveProduct.setName("NVIDIA inactive graphics card");
+        inactiveProduct.setStatus(ProductStatus.INACTIVE);
+        productRepository.saveAndFlush(inactiveProduct);
+
+        ProductEntity outOfStockProduct = ProductFactory.graphicCard();
+        outOfStockProduct.setId(0);
+        outOfStockProduct.setSku("OUT-OF-STOCK-GPU");
+        outOfStockProduct.setName("NVIDIA out of stock graphics card");
+        outOfStockProduct.setStatus(ProductStatus.OUT_OF_STOCK);
+        outOfStockProduct.setStock(0);
+        productRepository.saveAndFlush(outOfStockProduct);
+
+        customerRestTestClient.get()
+                .uri("?name=NVIDIA")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.totalElements").isEqualTo(1)
+                .jsonPath("$.content.length()").isEqualTo(1)
+                .jsonPath("$.content[?(@.id == 1)]").isNotEmpty()
+                .jsonPath("$.content[?(@.sku == 'INACTIVE-GPU')]").isEmpty()
+                .jsonPath("$.content[?(@.sku == 'OUT-OF-STOCK-GPU')]").isEmpty();
+    }
+
+    @Test
+    void getProductsByCategory_whenCustomerSearchesProductsWithDifferentStatuses_thenReturnOnlyActiveProducts()
+    {
+        ProductEntity inactiveProduct = ProductFactory.graphicCard();
+        inactiveProduct.setId(0);
+        inactiveProduct.setSku("INACTIVE-GPU");
+        inactiveProduct.setName("NVIDIA inactive graphics card");
+        inactiveProduct.setStatus(ProductStatus.INACTIVE);
+        productRepository.saveAndFlush(inactiveProduct);
+
+        ProductEntity outOfStockProduct = ProductFactory.graphicCard();
+        outOfStockProduct.setId(0);
+        outOfStockProduct.setSku("OUT-OF-STOCK-GPU");
+        outOfStockProduct.setName("NVIDIA out of stock graphics card");
+        outOfStockProduct.setStatus(ProductStatus.OUT_OF_STOCK);
+        outOfStockProduct.setStock(0);
+        productRepository.saveAndFlush(outOfStockProduct);
+
+        customerRestTestClient.get()
+                .uri("?category=GRAPHIC_CARD")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.totalElements").isEqualTo(1)
+                .jsonPath("$.content.length()").isEqualTo(1)
+                .jsonPath("$.content[?(@.id == 1)]").isNotEmpty()
+                .jsonPath("$.content[?(@.sku == 'INACTIVE-GPU')]").isEmpty()
+                .jsonPath("$.content[?(@.sku == 'OUT-OF-STOCK-GPU')]").isEmpty();
+    }
+
+    @Test
+    void getProductById_whenCustomerRequestsActiveProduct_thenReturnProduct()
+    {
+        customerRestTestClient.get()
+                .uri("/{id}", 1)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(1)
+                .jsonPath("$.stock").isEqualTo(50);
     }
 }

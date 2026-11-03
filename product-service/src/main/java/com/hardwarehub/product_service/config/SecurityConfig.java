@@ -29,7 +29,7 @@ public class SecurityConfig
 
                         .requestMatchers(HttpMethod.GET, "/api/v1/products", "/api/v1/products/**").permitAll()
 
-                        .requestMatchers("/api/v1/products/**").hasAnyRole("ADMIN", "STAFF")
+                        .requestMatchers("/api/v1/admin/products", "/api/v1/admin/products/**").hasAnyRole("ADMIN", "STAFF")
 
                         .anyRequest().denyAll()
                 )
