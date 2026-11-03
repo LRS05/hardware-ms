@@ -3,7 +3,7 @@ CREATE TABLE products (
     status VARCHAR(255) NOT NULL,
     category VARCHAR(255),
     sku VARCHAR(255) NOT NULL UNIQUE,
-    name VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL UNIQUE,
     description VARCHAR(300),
     price DECIMAL(10, 2) NOT NULL,
     stock INTEGER NOT NULL,
