@@ -17,6 +17,7 @@ import com.hardwarehub.product_service.mapper.ProductMapper;
 import com.hardwarehub.product_service.repository.ProductRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -535,7 +536,7 @@ public class ProductServiceTest
     }
 
     @Test
-    void increaseStockById_whenProductIsInactive_thenIncreaseStockAndActivate()
+    void increaseStockById_whenProductIsInactive_thenIncreaseStockAndKeepInactive()
     {
         // Given
         int id = 1;
@@ -550,7 +551,7 @@ public class ProductServiceTest
 
         // Then
         assertEquals(75, product.getStock());
-        assertEquals(ProductStatus.ACTIVE, product.getStatus());
+        assertEquals(ProductStatus.INACTIVE, product.getStatus());
 
         verify(productRepository).save(product);
         verifyNoMoreInteractions(productRepository);
@@ -594,7 +595,7 @@ public class ProductServiceTest
     }
 
     @Test
-    void decreaseStockById_whenStockReachesZero_thenDeactivateProduct()
+    void decreaseStockById_whenStockReachesZero_thenMarkProductOutOfStock()
     {
         // Given
         int id = 1;
@@ -610,7 +611,7 @@ public class ProductServiceTest
 
         // Then
         assertEquals(0, product.getStock());
-        assertEquals(ProductStatus.INACTIVE, product.getStatus());
+        assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
 
         verify(productRepository).save(product);
         verifyNoMoreInteractions(productRepository);
@@ -701,5 +702,444 @@ public class ProductServiceTest
         // Then
         verify(productRepository).findByIdForUpdate(id);
         verifyNoMoreInteractions(productRepository);
+    }
+
+    @Test
+    void getByIdForAdmin_whenProductIsActive_thenReturnProduct()
+    {
+        // Given
+        int id = 1;
+        ProductEntity product = ProductFactory.graphicCard();
+        product.setStatus(ProductStatus.ACTIVE);
+        product.setStock(50);
+        ProductResponseDTO productDTO = ProductFactory.graphicCardDTO();
+
+        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(productMapper.entityToDTO(product)).thenReturn(productDTO);
+
+        // When
+        ProductResponseDTO result = productService.getByIdForAdmin(id);
+
+        // Then
+        assertEquals(productDTO, result);
+        verify(productRepository).findById(id);
+        verify(productMapper).entityToDTO(product);
+        verifyNoMoreInteractions(productRepository, productMapper);
+    }
+
+    @Test
+    void getByIdForAdmin_whenProductIsOutOfStock_thenReturnProduct()
+    {
+        // Given
+        int id = 1;
+        ProductEntity product = ProductFactory.graphicCard();
+        product.setStatus(ProductStatus.OUT_OF_STOCK);
+        product.setStock(0);
+        ProductResponseDTO productDTO = ProductFactory.graphicCardDTO();
+
+        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(productMapper.entityToDTO(product)).thenReturn(productDTO);
+
+        // When
+        ProductResponseDTO result = productService.getByIdForAdmin(id);
+
+        // Then
+        assertEquals(productDTO, result);
+        verify(productRepository).findById(id);
+        verify(productMapper).entityToDTO(product);
+        verifyNoMoreInteractions(productRepository, productMapper);
+    }
+
+    @Test
+    void getByIdForAdmin_whenProductIsInactive_thenReturnProduct()
+    {
+        // Given
+        int id = 1;
+        ProductEntity product = ProductFactory.graphicCard();
+        product.setStatus(ProductStatus.INACTIVE);
+        product.setStock(50);
+        ProductResponseDTO productDTO = ProductFactory.graphicCardDTO();
+
+        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(productMapper.entityToDTO(product)).thenReturn(productDTO);
+
+        // When
+        ProductResponseDTO result = productService.getByIdForAdmin(id);
+
+        // Then
+        assertEquals(productDTO, result);
+        verify(productRepository).findById(id);
+        verify(productMapper).entityToDTO(product);
+        verifyNoMoreInteractions(productRepository, productMapper);
+    }
+
+    @Test
+    void getByIdForAdmin_whenProductDoesNotExist_thenThrowProductNotFoundException()
+    {
+        // Given
+        int id = 999;
+        when(productRepository.findById(id)).thenReturn(Optional.empty());
+
+        // When
+        assertThrows(ProductNotFoundException.class, () -> productService.getByIdForAdmin(id));
+
+        // Then
+        verify(productRepository).findById(id);
+        verifyNoMoreInteractions(productRepository);
+        verifyNoInteractions(productMapper);
+    }
+
+    @Test
+    void create_whenActiveProductHasNoStock_thenMarkProductOutOfStock()
+    {
+        // Given
+        ProductRequestDTO requestDTO = new ProductRequestDTO(
+                ProductStatus.ACTIVE,
+                Category.GRAPHIC_CARD,
+                "NEW-GPU-001",
+                "New GPU",
+                "A new graphics card",
+                BigDecimal.valueOf(1200),
+                0
+        );
+        ProductEntity product = ProductFactory.graphicCard();
+        ProductResponseDTO productDTO = ProductFactory.graphicCardDTO();
+        ArgumentCaptor<ProductEntity> productCaptor = ArgumentCaptor.forClass(ProductEntity.class);
+
+        when(productRepository.save(any(ProductEntity.class))).thenReturn(product);
+        when(productMapper.entityToDTO(product)).thenReturn(productDTO);
+
+        // When
+        ProductResponseDTO result = productService.create(requestDTO);
+
+        // Then
+        assertEquals(productDTO, result);
+        verify(productRepository).existsByName(requestDTO.name());
+        verify(productRepository).existsBySku(requestDTO.sku());
+        verify(productRepository).save(productCaptor.capture());
+        assertEquals(0, productCaptor.getValue().getStock());
+        assertEquals(ProductStatus.OUT_OF_STOCK, productCaptor.getValue().getStatus());
+        verify(productMapper).entityToDTO(product);
+        verifyNoMoreInteractions(productRepository, productMapper);
+    }
+
+    @Test
+    void create_whenInactiveProductHasNoStock_thenKeepInactive()
+    {
+        // Given
+        ProductRequestDTO requestDTO = new ProductRequestDTO(
+                ProductStatus.INACTIVE,
+                Category.GRAPHIC_CARD,
+                "NEW-GPU-001",
+                "New GPU",
+                "A new graphics card",
+                BigDecimal.valueOf(1200),
+                0
+        );
+        ProductEntity product = ProductFactory.graphicCard();
+        ProductResponseDTO productDTO = ProductFactory.graphicCardDTO();
+        ArgumentCaptor<ProductEntity> productCaptor = ArgumentCaptor.forClass(ProductEntity.class);
+
+        when(productRepository.save(any(ProductEntity.class))).thenReturn(product);
+        when(productMapper.entityToDTO(product)).thenReturn(productDTO);
+
+        // When
+        ProductResponseDTO result = productService.create(requestDTO);
+
+        // Then
+        assertEquals(productDTO, result);
+        verify(productRepository).existsByName(requestDTO.name());
+        verify(productRepository).existsBySku(requestDTO.sku());
+        verify(productRepository).save(productCaptor.capture());
+        assertEquals(0, productCaptor.getValue().getStock());
+        assertEquals(ProductStatus.INACTIVE, productCaptor.getValue().getStatus());
+        verify(productMapper).entityToDTO(product);
+        verifyNoMoreInteractions(productRepository, productMapper);
+    }
+
+    @Test
+    void updateById_whenActiveProductStockReachesZero_thenMarkProductOutOfStock()
+    {
+        // Given
+        int id = 1;
+        ProductEntity product = ProductFactory.graphicCard();
+        product.setStatus(ProductStatus.ACTIVE);
+        product.setStock(50);
+        ProductUpdateRequestDTO requestDTO = new ProductUpdateRequestDTO(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0
+        );
+        ProductResponseDTO productDTO = ProductFactory.graphicCardDTO();
+
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(productMapper.entityToDTO(product)).thenReturn(productDTO);
+
+        // When
+        ProductResponseDTO result = productService.updateById(id, requestDTO);
+
+        // Then
+        assertEquals(productDTO, result);
+        assertEquals(0, product.getStock());
+        assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
+        verify(productRepository).findByIdForUpdate(id);
+        verify(productRepository).save(product);
+        verify(productMapper).entityToDTO(product);
+        verifyNoMoreInteractions(productRepository, productMapper);
+    }
+
+    @Test
+    void updateById_whenOutOfStockProductIsRestocked_thenActivateProduct()
+    {
+        // Given
+        int id = 1;
+        ProductEntity product = ProductFactory.graphicCard();
+        product.setStatus(ProductStatus.OUT_OF_STOCK);
+        product.setStock(0);
+        ProductUpdateRequestDTO requestDTO = new ProductUpdateRequestDTO(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                10
+        );
+        ProductResponseDTO productDTO = ProductFactory.graphicCardDTO();
+
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(productMapper.entityToDTO(product)).thenReturn(productDTO);
+
+        // When
+        ProductResponseDTO result = productService.updateById(id, requestDTO);
+
+        // Then
+        assertEquals(productDTO, result);
+        assertEquals(10, product.getStock());
+        assertEquals(ProductStatus.ACTIVE, product.getStatus());
+        verify(productRepository).findByIdForUpdate(id);
+        verify(productRepository).save(product);
+        verify(productMapper).entityToDTO(product);
+        verifyNoMoreInteractions(productRepository, productMapper);
+    }
+
+    @Test
+    void updateById_whenInactiveProductIsRestocked_thenKeepInactive()
+    {
+        // Given
+        int id = 1;
+        ProductEntity product = ProductFactory.graphicCard();
+        product.setStatus(ProductStatus.INACTIVE);
+        product.setStock(0);
+        ProductUpdateRequestDTO requestDTO = new ProductUpdateRequestDTO(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                10
+        );
+        ProductResponseDTO productDTO = ProductFactory.graphicCardDTO();
+
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(productMapper.entityToDTO(product)).thenReturn(productDTO);
+
+        // When
+        ProductResponseDTO result = productService.updateById(id, requestDTO);
+
+        // Then
+        assertEquals(productDTO, result);
+        assertEquals(10, product.getStock());
+        assertEquals(ProductStatus.INACTIVE, product.getStatus());
+        verify(productRepository).findByIdForUpdate(id);
+        verify(productRepository).save(product);
+        verify(productMapper).entityToDTO(product);
+        verifyNoMoreInteractions(productRepository, productMapper);
+    }
+
+    @Test
+    void updateById_whenInactiveProductStockReachesZero_thenKeepInactive()
+    {
+        // Given
+        int id = 1;
+        ProductEntity product = ProductFactory.graphicCard();
+        product.setStatus(ProductStatus.INACTIVE);
+        product.setStock(50);
+        ProductUpdateRequestDTO requestDTO = new ProductUpdateRequestDTO(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0
+        );
+        ProductResponseDTO productDTO = ProductFactory.graphicCardDTO();
+
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(productMapper.entityToDTO(product)).thenReturn(productDTO);
+
+        // When
+        ProductResponseDTO result = productService.updateById(id, requestDTO);
+
+        // Then
+        assertEquals(productDTO, result);
+        assertEquals(0, product.getStock());
+        assertEquals(ProductStatus.INACTIVE, product.getStatus());
+        verify(productRepository).findByIdForUpdate(id);
+        verify(productRepository).save(product);
+        verify(productMapper).entityToDTO(product);
+        verifyNoMoreInteractions(productRepository, productMapper);
+    }
+
+    @Test
+    void updateById_whenInactiveProductIsActivatedWithStock_thenActivateProduct()
+    {
+        // Given
+        int id = 1;
+        ProductEntity product = ProductFactory.graphicCard();
+        product.setStatus(ProductStatus.INACTIVE);
+        product.setStock(50);
+        ProductUpdateRequestDTO requestDTO = new ProductUpdateRequestDTO(
+                ProductStatus.ACTIVE,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+        ProductResponseDTO productDTO = ProductFactory.graphicCardDTO();
+
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(productMapper.entityToDTO(product)).thenReturn(productDTO);
+
+        // When
+        ProductResponseDTO result = productService.updateById(id, requestDTO);
+
+        // Then
+        assertEquals(productDTO, result);
+        assertEquals(50, product.getStock());
+        assertEquals(ProductStatus.ACTIVE, product.getStatus());
+        verify(productRepository).findByIdForUpdate(id);
+        verify(productRepository).save(product);
+        verify(productMapper).entityToDTO(product);
+        verifyNoMoreInteractions(productRepository, productMapper);
+    }
+
+    @Test
+    void updateById_whenInactiveProductIsActivatedWithoutStock_thenMarkProductOutOfStock()
+    {
+        // Given
+        int id = 1;
+        ProductEntity product = ProductFactory.graphicCard();
+        product.setStatus(ProductStatus.INACTIVE);
+        product.setStock(0);
+        ProductUpdateRequestDTO requestDTO = new ProductUpdateRequestDTO(
+                ProductStatus.ACTIVE,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+        ProductResponseDTO productDTO = ProductFactory.graphicCardDTO();
+
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(productMapper.entityToDTO(product)).thenReturn(productDTO);
+
+        // When
+        ProductResponseDTO result = productService.updateById(id, requestDTO);
+
+        // Then
+        assertEquals(productDTO, result);
+        assertEquals(0, product.getStock());
+        assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
+        verify(productRepository).findByIdForUpdate(id);
+        verify(productRepository).save(product);
+        verify(productMapper).entityToDTO(product);
+        verifyNoMoreInteractions(productRepository, productMapper);
+    }
+
+    @Test
+    void increaseStockById_whenProductIsOutOfStock_thenIncreaseStockAndActivate()
+    {
+        // Given
+        int id = 1;
+        ProductEntity product = ProductFactory.graphicCard();
+        product.setStock(0);
+        product.setStatus(ProductStatus.OUT_OF_STOCK);
+        StockRequestDTO requestDTO = new StockRequestDTO(25);
+
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
+
+        // When
+        productService.increaseStockById(id, requestDTO);
+
+        // Then
+        assertEquals(25, product.getStock());
+        assertEquals(ProductStatus.ACTIVE, product.getStatus());
+        verify(productRepository).findByIdForUpdate(id);
+        verify(productRepository).save(product);
+        verifyNoMoreInteractions(productRepository);
+        verifyNoInteractions(productMapper);
+    }
+
+    @Test
+    void getById_whenProductIsOutOfStock_thenThrowProductOutOfStockException()
+    {
+        // Given
+        int id = 1;
+        ProductEntity product = ProductFactory.graphicCard();
+        product.setStock(0);
+        product.setStatus(ProductStatus.OUT_OF_STOCK);
+
+        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+
+        // When
+        assertThrows(ProductOutOfStockException.class,
+                () -> productService.getById(id));
+
+        // Then
+        assertEquals(0, product.getStock());
+        assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
+        verify(productRepository).findById(id);
+        verifyNoMoreInteractions(productRepository);
+        verifyNoInteractions(productMapper);
+    }
+
+    @Test
+    void decreaseStockById_whenProductIsOutOfStock_thenThrowProductOutOfStockException()
+    {
+        // Given
+        int id = 1;
+        ProductEntity product = ProductFactory.graphicCard();
+        product.setStock(0);
+        product.setStatus(ProductStatus.OUT_OF_STOCK);
+
+        when(productRepository.findByIdForUpdate(id)).thenReturn(Optional.of(product));
+
+        // When
+        assertThrows(ProductOutOfStockException.class,
+                () -> productService.decreaseStockById(id, new StockRequestDTO(1)));
+
+        // Then
+        assertEquals(0, product.getStock());
+        assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
+        verify(productRepository).findByIdForUpdate(id);
+        verifyNoMoreInteractions(productRepository);
+        verifyNoInteractions(productMapper);
     }
 }

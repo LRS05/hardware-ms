@@ -4,6 +4,7 @@ import com.hardwarehub.product_service.enums.Category;
 import com.hardwarehub.product_service.enums.ProductStatus;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -38,7 +39,7 @@ public record ProductUpdateRequestDTO(
         @Positive(message = "Price must be greater than zero.")
         BigDecimal price,
 
-        @Positive(message = "Stock must be greater than zero.")
+        @PositiveOrZero(message = "Stock must be greater than or equal to zero.")
         Integer stock
 ) {
 }

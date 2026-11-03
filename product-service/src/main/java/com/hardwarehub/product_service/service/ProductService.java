@@ -31,19 +31,19 @@ public class ProductService
     {
         validateNameOrSkuAreAvailable(requestDTO.name(), requestDTO.sku());
 
-        ProductEntity product = productRepository.save(
-                ProductEntity.builder()
-                        .status(requestDTO.status())
-                        .category(requestDTO.category())
-                        .sku(requestDTO.sku())
-                        .name(requestDTO.name())
-                        .description(requestDTO.description())
-                        .price(requestDTO.price())
-                        .stock(requestDTO.stock())
-                        .build()
-        );
+        ProductEntity product =  ProductEntity.builder()
+                .status(requestDTO.status())
+                .category(requestDTO.category())
+                .sku(requestDTO.sku())
+                .name(requestDTO.name())
+                .description(requestDTO.description())
+                .price(requestDTO.price())
+                .stock(requestDTO.stock())
+                .build();
 
-        return productMapper.entityToDTO(product);
+        synchronizeStockStatus(product);
+
+        return productMapper.entityToDTO(productRepository.save(product));
     }
 
     public ProductResponseDTO getById(int id)
@@ -56,6 +56,11 @@ public class ProductService
         }
 
         return productMapper.entityToDTO(product);
+    }
+
+    public ProductResponseDTO getByIdForAdmin(int id)
+    {
+        return productMapper.entityToDTO(findByIdOrThrow(id));
     }
 
     public ProductResponseDTO getBySku(String sku)
@@ -104,7 +109,7 @@ public class ProductService
 
         product.setStock(product.getStock() + requestDTO.stock());
 
-        if (product.getStatus() != ProductStatus.ACTIVE) product.setStatus(ProductStatus.ACTIVE);
+        synchronizeStockStatus(product);
 
         productRepository.save(product);
     }
@@ -118,7 +123,7 @@ public class ProductService
 
         product.setStock(product.getStock() - requestDTO.stock());
 
-        if (product.getStock() == 0) product.setStatus(ProductStatus.INACTIVE);
+        synchronizeStockStatus(product);
 
         productRepository.save(product);
     }
@@ -155,9 +160,9 @@ public class ProductService
 
     private void validateStock(ProductEntity product, int requiredStock)
     {
-        if (product.getStatus() == ProductStatus.INACTIVE)
+        if (product.getStatus() != ProductStatus.ACTIVE)
         {
-            throw new ProductOutOfStockException("This product is out of stock.");
+            throw new ProductOutOfStockException("This product is not available.");
         }
 
         if (product.getStock() < requiredStock)
@@ -202,6 +207,8 @@ public class ProductService
         {
             product.setStock(requestDTO.stock());
         }
+
+        synchronizeStockStatus(product);
     }
 
     private void validateNameOrSkuAreAvailableForUpdate(int id, String name, String sku)
@@ -227,6 +234,23 @@ public class ProductService
         if (productRepository.existsBySku(sku))
         {
             throw new ProductSkuAlreadyExistsException("SKU already exists.");
+        }
+    }
+
+    private void synchronizeStockStatus(ProductEntity product)
+    {
+        if (product.getStatus() == ProductStatus.INACTIVE)
+        {
+            return;
+        }
+
+        if (product.getStock() == 0)
+        {
+            product.setStatus(ProductStatus.OUT_OF_STOCK);
+        }
+        else
+        {
+            product.setStatus(ProductStatus.ACTIVE);
         }
     }
 }

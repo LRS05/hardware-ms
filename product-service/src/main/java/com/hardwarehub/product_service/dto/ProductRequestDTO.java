@@ -5,6 +5,7 @@ import com.hardwarehub.product_service.enums.ProductStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -34,7 +35,7 @@ public record ProductRequestDTO(
         BigDecimal price,
 
         @NotNull(message = "Stock is required.")
-        @Positive(message = "Stock must be greater than zero.")
+        @PositiveOrZero(message = "Stock must be greater than or equal to zero.")
         Integer stock
 ) {
 }
