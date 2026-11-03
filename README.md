@@ -1,4 +1,4 @@
-# Hardware Hub API
+# Hardware - Microservices API
 
 A REST API for managing a hardware store, built with Java, Spring Boot and Spring Cloud. The project separates authentication, users, products and orders into microservices, with an API Gateway, service discovery and centralized configuration.
 
