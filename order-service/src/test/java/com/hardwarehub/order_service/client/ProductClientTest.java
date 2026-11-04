@@ -1,6 +1,8 @@
 package com.hardwarehub.order_service.client;
 
 import com.hardwarehub.order_service.client.dto.ProductResponseDTO;
+import com.hardwarehub.order_service.client.dto.ItemReservationDTO;
+import com.hardwarehub.order_service.client.dto.StockReservationRequestDTO;
 import com.hardwarehub.order_service.exception.ProductIntegrationException;
 import com.hardwarehub.order_service.exception.ProductNotFoundException;
 import com.hardwarehub.order_service.exception.ProductOutOfStockException;
@@ -23,6 +25,7 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.http.HttpConnectTimeoutException;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
@@ -45,6 +48,67 @@ public class ProductClientTest
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
         productClient = new ProductClient(builder, apiKey);
+    }
+
+    @Test
+    void reserveStock_whenProductServiceReturnsNoContent_thenSendEntireBatch()
+    {
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(List.of(
+                new ItemReservationDTO(1, 2),
+                new ItemReservationDTO(2, 3)
+        ));
+
+        server.expect(requestTo("http://product-service/internal/products/reserve"))
+                .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header("X-API-Key", apiKey))
+                .andExpect(content().json("{\"items\":[{\"productId\":1,\"quantity\":2},{\"productId\":2,\"quantity\":3}]}"))
+                .andRespond(withNoContent());
+
+        productClient.reserveStock(requestDTO);
+
+        server.verify();
+    }
+
+    @Test
+    void reserveStock_whenProductServiceReturnsConflict_thenThrowProductOutOfStockException()
+    {
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2)));
+
+        server.expect(requestTo("http://product-service/internal/products/reserve"))
+                .andExpect(method(HttpMethod.PATCH))
+                .andRespond(withStatus(HttpStatus.CONFLICT));
+
+        assertThrows(ProductOutOfStockException.class, () -> productClient.reserveStock(requestDTO));
+
+        server.verify();
+    }
+
+    @Test
+    void reserveStock_whenProductServiceReturnsNotFound_thenThrowProductNotFoundException()
+    {
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2)));
+
+        server.expect(requestTo("http://product-service/internal/products/reserve"))
+                .andExpect(method(HttpMethod.PATCH))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThrows(ProductNotFoundException.class, () -> productClient.reserveStock(requestDTO));
+
+        server.verify();
+    }
+
+    @Test
+    void reserveStock_whenProductServiceReadTimesOut_thenThrowProductTimeoutExceptionWithoutRetrying()
+    {
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2)));
+
+        server.expect(requestTo("http://product-service/internal/products/reserve"))
+                .andExpect(method(HttpMethod.PATCH))
+                .andRespond(withException(new SocketTimeoutException("Read timed out")));
+
+        assertThrows(ProductTimeoutException.class, () -> productClient.reserveStock(requestDTO));
+
+        server.verify();
     }
 
     @Test

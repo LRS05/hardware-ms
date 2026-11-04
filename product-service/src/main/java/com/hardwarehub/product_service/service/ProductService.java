@@ -4,6 +4,8 @@ import com.hardwarehub.product_service.dto.ProductRequestDTO;
 import com.hardwarehub.product_service.dto.ProductResponseDTO;
 import com.hardwarehub.product_service.dto.ProductUpdateRequestDTO;
 import com.hardwarehub.product_service.dto.StockRequestDTO;
+import com.hardwarehub.product_service.dto.ItemReservationDTO;
+import com.hardwarehub.product_service.dto.StockReservationRequestDTO;
 import com.hardwarehub.product_service.entity.ProductEntity;
 import com.hardwarehub.product_service.enums.Category;
 import com.hardwarehub.product_service.enums.ProductStatus;
@@ -19,6 +21,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Comparator;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -100,6 +105,47 @@ public class ProductService
         updateProduct(product, requestDTO);
 
         return productMapper.entityToDTO(productRepository.save(product));
+    }
+
+    /**
+     * Reserves stock for all product in an order.
+     * If any product does not exist or has insufficient stock,
+     * the entire reservation is rolled back.
+     */
+    @Transactional
+    public void reserveStock(StockReservationRequestDTO requestDTO)
+    {
+        List<ItemReservationDTO> items = requestDTO.items().stream()
+                .sorted(Comparator.comparing(ItemReservationDTO::productId))
+                .toList();
+
+        for (ItemReservationDTO item : items)
+        {
+            ProductEntity product = findByIdForUpdateOrThrow(item.productId());
+
+            validateStock(product, item.quantity());
+
+            product.setStock(product.getStock() - item.quantity());
+
+            synchronizeStockStatus(product);
+        }
+    }
+
+    @Transactional
+    public void releaseStock(StockReservationRequestDTO requestDTO)
+    {
+        List<ItemReservationDTO> items = requestDTO.items().stream()
+                .sorted(Comparator.comparing(ItemReservationDTO::productId))
+                .toList();
+
+        for (ItemReservationDTO item : items)
+        {
+            ProductEntity product = findByIdForUpdateOrThrow(item.productId());
+
+            product.setStock(product.getStock() + item.quantity());
+
+            synchronizeStockStatus(product);
+        }
     }
 
     @Transactional

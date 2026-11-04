@@ -2,6 +2,8 @@ package com.hardwarehub.order_service.service;
 
 import com.hardwarehub.order_service.client.ProductClient;
 import com.hardwarehub.order_service.client.dto.ProductResponseDTO;
+import com.hardwarehub.order_service.client.dto.ItemReservationDTO;
+import com.hardwarehub.order_service.client.dto.StockReservationRequestDTO;
 import com.hardwarehub.order_service.dto.OrderResponseDTO;
 import com.hardwarehub.order_service.entity.OrderEntity;
 import com.hardwarehub.order_service.entity.OrderItemEntity;
@@ -14,6 +16,7 @@ import com.hardwarehub.order_service.exception.PendingOrderExistsException;
 import com.hardwarehub.order_service.exception.ProductNotFoundException;
 import com.hardwarehub.order_service.exception.ProductOutOfStockException;
 import com.hardwarehub.order_service.factory.OrderFactory;
+import com.hardwarehub.order_service.factory.ProductFactory;
 import com.hardwarehub.order_service.mapper.OrderItemMapper;
 import com.hardwarehub.order_service.mapper.OrderMapper;
 import com.hardwarehub.order_service.repository.OrderItemRepository;
@@ -500,9 +503,34 @@ public class OrderServiceTest
         assertEquals(BigDecimal.valueOf(3000), item.getPrice());
         assertEquals(BigDecimal.valueOf(3000), order.getTotalPrice());
 
-        verify(productClient).decreaseStockById(item.getProductId(), 2);
+        verify(productClient).reserveStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(item.getProductId(), 2))));
         verify(orderRepository).save(order);
         verify(orderMapper).entityToDTO(order);
+    }
+
+    @Test
+    void checkout_whenOrderHasMultipleProducts_thenReserveAllProductsInOneCall()
+    {
+        int userId = 1;
+        OrderEntity order = OrderFactory.activeOrder();
+        OrderItemEntity secondItem = OrderFactory.graphicCardOne();
+        secondItem.setProductId(2);
+        secondItem.setQuantity(3);
+        order.addItem(secondItem);
+
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
+        when(productClient.getById(1)).thenReturn(ProductFactory.graphicCardDTO());
+        when(productClient.getById(2)).thenReturn(ProductFactory.processorDTO());
+        when(orderRepository.save(order)).thenReturn(order);
+
+        orderService.checkout(userId);
+
+        verify(productClient).reserveStock(new StockReservationRequestDTO(List.of(
+                new ItemReservationDTO(1, 2),
+                new ItemReservationDTO(2, 3)
+        )));
+        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
+        assertEquals(OrderStatus.PENDING, order.getStatus());
     }
 
     @Test
@@ -525,7 +553,7 @@ public class OrderServiceTest
         assertEquals(OrderStatus.ACTIVE, order.getStatus());
 
         verify(orderRepository, never()).save(any(OrderEntity.class));
-        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
+        verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
         verifyNoInteractions(orderMapper);
     }
 
@@ -549,7 +577,7 @@ public class OrderServiceTest
         assertEquals(OrderStatus.ACTIVE, order.getStatus());
 
         verify(orderRepository, never()).save(any(OrderEntity.class));
-        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
+        verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
         verifyNoInteractions(orderMapper);
     }
 
@@ -576,7 +604,7 @@ public class OrderServiceTest
 
         when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(productClient.getById(1)).thenReturn(product);
-        doThrow(new ProductOutOfStockException("Insufficient stock.")).when(productClient).decreaseStockById(1, 2);
+        doThrow(new ProductOutOfStockException("Insufficient stock.")).when(productClient).reserveStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
 
         // When
         assertThrows(ProductOutOfStockException.class, () -> orderService.checkout(userId));
@@ -632,7 +660,7 @@ public class OrderServiceTest
         assertEquals(orderDTO, result);
         assertEquals(OrderStatus.ACTIVE, order.getStatus());
 
-        verify(productClient).increaseStockById(1, 2);
+        verify(productClient).releaseStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
         verify(orderRepository).save(order);
     }
 
@@ -646,7 +674,7 @@ public class OrderServiceTest
         order.setStatus(OrderStatus.PENDING);
 
         when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name())).thenReturn(Optional.of(order));
-        doThrow(new ProductNotFoundException("Product not found.")).when(productClient).increaseStockById(1, 2);
+        doThrow(new ProductNotFoundException("Product not found.")).when(productClient).releaseStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
 
         // When
         assertThrows(ProductNotFoundException.class, () -> orderService.reopen(userId));

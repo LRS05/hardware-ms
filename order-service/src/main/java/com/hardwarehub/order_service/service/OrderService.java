@@ -1,7 +1,9 @@
 package com.hardwarehub.order_service.service;
 
 import com.hardwarehub.order_service.client.ProductClient;
+import com.hardwarehub.order_service.client.dto.ItemReservationDTO;
 import com.hardwarehub.order_service.client.dto.ProductResponseDTO;
+import com.hardwarehub.order_service.client.dto.StockReservationRequestDTO;
 import com.hardwarehub.order_service.dto.OrderResponseDTO;
 import com.hardwarehub.order_service.entity.OrderEntity;
 import com.hardwarehub.order_service.entity.OrderItemEntity;
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The user ID is extracted from the JWT claims.
@@ -275,20 +278,20 @@ public class OrderService
 
     private void reserveProductStock(OrderEntity order)
     {
-        order.getOrderItems()
-                .forEach(o -> productClient.decreaseStockById(
-                        o.getProductId(),
-                        o.getQuantity()
-                ));
+        List<ItemReservationDTO> items = order.getOrderItems().stream()
+                .map(item -> new ItemReservationDTO(item.getProductId(), item.getQuantity()))
+                .toList();
+
+        productClient.reserveStock(new StockReservationRequestDTO(items));
     }
 
     private void releaseProductStock(OrderEntity order)
     {
-        order.getOrderItems()
-                .forEach(o -> productClient.increaseStockById(
-                        o.getProductId(),
-                        o.getQuantity()
-                ));
+        List<ItemReservationDTO> items = order.getOrderItems().stream()
+                .map(item -> new ItemReservationDTO(item.getProductId(), item.getQuantity()))
+                .toList();
+
+        productClient.releaseStock(new StockReservationRequestDTO(items));
     }
 
     private OrderEntity findPendingOrderOrThrow(int userId)

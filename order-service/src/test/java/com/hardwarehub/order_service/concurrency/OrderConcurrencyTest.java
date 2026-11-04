@@ -2,6 +2,8 @@ package com.hardwarehub.order_service.concurrency;
 
 import com.hardwarehub.order_service.client.ProductClient;
 import com.hardwarehub.order_service.client.dto.ProductResponseDTO;
+import com.hardwarehub.order_service.client.dto.ItemReservationDTO;
+import com.hardwarehub.order_service.client.dto.StockReservationRequestDTO;
 import com.hardwarehub.order_service.config.PostgresTestConfig;
 import com.hardwarehub.order_service.entity.OrderEntity;
 import com.hardwarehub.order_service.entity.OrderItemEntity;
@@ -221,8 +223,8 @@ public class OrderConcurrencyTest
                 Integer.class,
                 updatedOrder.getId()
         ));
-        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
-        verify(productClient, never()).increaseStockById(anyInt(), anyInt());
+        verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
+        verify(productClient, never()).releaseStock(any(StockReservationRequestDTO.class));
     }
 
     @Test
@@ -283,8 +285,8 @@ public class OrderConcurrencyTest
                 Integer.class,
                 orderId
         ));
-        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
-        verify(productClient, never()).increaseStockById(anyInt(), anyInt());
+        verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
+        verify(productClient, never()).releaseStock(any(StockReservationRequestDTO.class));
     }
 
     @Test
@@ -345,8 +347,8 @@ public class OrderConcurrencyTest
                 Integer.class,
                 orderId
         ));
-        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
-        verify(productClient, never()).increaseStockById(anyInt(), anyInt());
+        verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
+        verify(productClient, never()).releaseStock(any(StockReservationRequestDTO.class));
     }
 
     @Test
@@ -412,8 +414,8 @@ public class OrderConcurrencyTest
         assertEquals(new BigDecimal("800.00"), updatedSecondItem.getPrice());
         assertEquals(new BigDecimal("3800.00"), updatedOrder.getTotalPrice());
         assertEquals(OrderStatus.ACTIVE, updatedOrder.getStatus());
-        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
-        verify(productClient, never()).increaseStockById(anyInt(), anyInt());
+        verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
+        verify(productClient, never()).releaseStock(any(StockReservationRequestDTO.class));
     }
 
     @Test
@@ -469,8 +471,8 @@ public class OrderConcurrencyTest
         assertEquals(OrderStatus.PENDING, updatedOrder.getStatus());
         assertEquals(new BigDecimal("2000.00"), updatedOrder.getTotalPrice());
         assertEquals(2, updatedItem.getQuantity());
-        verify(productClient, times(1)).decreaseStockById(1, 2);
-        verify(productClient, never()).increaseStockById(anyInt(), anyInt());
+        verify(productClient, times(1)).reserveStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
+        verify(productClient, never()).releaseStock(any(StockReservationRequestDTO.class));
     }
 
     @Test
@@ -530,8 +532,8 @@ public class OrderConcurrencyTest
         assertEquals(OrderStatus.ACTIVE, updatedOrder.getStatus());
         assertEquals(new BigDecimal("2000.00"), updatedOrder.getTotalPrice());
         assertEquals(2, updatedItem.getQuantity());
-        verify(productClient, times(1)).increaseStockById(1, 2);
-        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
+        verify(productClient, times(1)).releaseStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
+        verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
     }
 
     @Test
@@ -631,16 +633,16 @@ public class OrderConcurrencyTest
         {
             assertEquals(404, reopenStatus);
             assertEquals(OrderStatus.COMPLETED, updatedOrder.getStatus());
-            verify(productClient, never()).increaseStockById(anyInt(), anyInt());
+            verify(productClient, never()).releaseStock(any(StockReservationRequestDTO.class));
         }
         else
         {
             assertEquals(200, reopenStatus);
             assertEquals(OrderStatus.ACTIVE, updatedOrder.getStatus());
-            verify(productClient, times(1)).increaseStockById(1, 2);
+            verify(productClient, times(1)).releaseStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
         }
 
-        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
+        verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
     }
 
     @Test
@@ -681,8 +683,8 @@ public class OrderConcurrencyTest
         assertEquals(new BigDecimal("4000.00"), updatedItem.getPrice());
         assertEquals(new BigDecimal("4000.00"), updatedOrder.getTotalPrice());
         assertEquals(OrderStatus.ACTIVE, updatedOrder.getStatus());
-        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
-        verify(productClient, never()).increaseStockById(anyInt(), anyInt());
+        verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
+        verify(productClient, never()).releaseStock(any(StockReservationRequestDTO.class));
     }
 
     @Test
@@ -733,8 +735,8 @@ public class OrderConcurrencyTest
         assertEquals(new BigDecimal("600.00"), updatedSecondItem.getPrice());
         assertEquals(new BigDecimal("3600.00"), updatedOrder.getTotalPrice());
         assertEquals(OrderStatus.ACTIVE, updatedOrder.getStatus());
-        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
-        verify(productClient, never()).increaseStockById(anyInt(), anyInt());
+        verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
+        verify(productClient, never()).releaseStock(any(StockReservationRequestDTO.class));
     }
 
     @Test
@@ -784,8 +786,8 @@ public class OrderConcurrencyTest
         assertEquals(new BigDecimal("600.00"), updatedOrder.getTotalPrice());
         assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM order_items WHERE order_id = ?", Integer.class, orderId));
         assertEquals(OrderStatus.ACTIVE, updatedOrder.getStatus());
-        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
-        verify(productClient, never()).increaseStockById(anyInt(), anyInt());
+        verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
+        verify(productClient, never()).releaseStock(any(StockReservationRequestDTO.class));
     }
 
     @Test
@@ -828,8 +830,8 @@ public class OrderConcurrencyTest
         assertEquals(new BigDecimal("4500.00"), updatedItem.getPrice());
         assertEquals(new BigDecimal("4500.00"), updatedOrder.getTotalPrice());
         assertEquals(OrderStatus.ACTIVE, updatedOrder.getStatus());
-        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
-        verify(productClient, never()).increaseStockById(anyInt(), anyInt());
+        verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
+        verify(productClient, never()).releaseStock(any(StockReservationRequestDTO.class));
     }
 
     @Test
@@ -868,8 +870,8 @@ public class OrderConcurrencyTest
         assertEquals(new BigDecimal("0.00"), updatedOrder.getTotalPrice());
         assertEquals(OrderStatus.ACTIVE, updatedOrder.getStatus());
         assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM order_items WHERE order_id = ?", Integer.class, orderId));
-        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
-        verify(productClient, never()).increaseStockById(anyInt(), anyInt());
+        verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
+        verify(productClient, never()).releaseStock(any(StockReservationRequestDTO.class));
     }
 
     @Test
@@ -909,9 +911,9 @@ public class OrderConcurrencyTest
         assertEquals(OrderStatus.PENDING, updatedOrder.getStatus());
         assertEquals(3, updatedItem.getQuantity());
         assertEquals(new BigDecimal("3000.00"), updatedOrder.getTotalPrice());
-        verify(productClient, times(1)).decreaseStockById(1, 3);
-        verify(productClient, never()).decreaseStockById(1, 2);
-        verify(productClient, never()).increaseStockById(anyInt(), anyInt());
+        verify(productClient, times(1)).reserveStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 3))));
+        verify(productClient, never()).reserveStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
+        verify(productClient, never()).releaseStock(any(StockReservationRequestDTO.class));
     }
 
     @Test
@@ -955,9 +957,9 @@ public class OrderConcurrencyTest
         assertEquals(OrderStatus.ACTIVE, updatedOrder.getStatus());
         assertEquals(3, updatedItem.getQuantity());
         assertEquals(new BigDecimal("3000.00"), updatedOrder.getTotalPrice());
-        verify(productClient, times(1)).increaseStockById(1, 3);
-        verify(productClient, never()).increaseStockById(1, 2);
-        verify(productClient, never()).decreaseStockById(anyInt(), anyInt());
+        verify(productClient, times(1)).releaseStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 3))));
+        verify(productClient, never()).releaseStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
+        verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
     }
 
     @Test

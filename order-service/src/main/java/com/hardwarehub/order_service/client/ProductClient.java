@@ -2,6 +2,7 @@ package com.hardwarehub.order_service.client;
 
 import com.hardwarehub.order_service.client.dto.ProductResponseDTO;
 import com.hardwarehub.order_service.client.dto.StockRequestDTO;
+import com.hardwarehub.order_service.client.dto.StockReservationRequestDTO;
 import com.hardwarehub.order_service.exception.ProductIntegrationException;
 import com.hardwarehub.order_service.exception.ProductNotFoundException;
 import com.hardwarehub.order_service.exception.ProductOutOfStockException;
@@ -41,6 +42,28 @@ public class ProductClient
                         .uri("/{id}", id)
                         .retrieve()
                         .body(ProductResponseDTO.class)
+        );
+    }
+
+    public void reserveStock(StockReservationRequestDTO requestDTO)
+    {
+        execute(() ->
+                restClient.patch()
+                        .uri("/reserve")
+                        .body(requestDTO)
+                        .retrieve()
+                        .toBodilessEntity()
+        );
+    }
+
+    public void releaseStock(StockReservationRequestDTO requestDTO)
+    {
+        execute(() ->
+                restClient.patch()
+                        .uri("/release")
+                        .body(requestDTO)
+                        .retrieve()
+                        .toBodilessEntity()
         );
     }
 

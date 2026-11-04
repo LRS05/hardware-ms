@@ -3,6 +3,7 @@ package com.hardwarehub.product_service.controller;
 
 import com.hardwarehub.product_service.dto.ProductResponseDTO;
 import com.hardwarehub.product_service.dto.StockRequestDTO;
+import com.hardwarehub.product_service.dto.StockReservationRequestDTO;
 import com.hardwarehub.product_service.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,20 @@ public class InternalController
     public ResponseEntity<ProductResponseDTO> getProductById(@PathVariable int id)
     {
         return ResponseEntity.ok(productService.getById(id));
+    }
+
+    @PatchMapping("/reserve")
+    public ResponseEntity<Void> reserveStock(@Valid @RequestBody StockReservationRequestDTO requestDTO)
+    {
+        productService.reserveStock(requestDTO);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/release")
+    public ResponseEntity<Void> releaseStock(@Valid @RequestBody StockReservationRequestDTO requestDTO)
+    {
+        productService.releaseStock(requestDTO);
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/decrease")

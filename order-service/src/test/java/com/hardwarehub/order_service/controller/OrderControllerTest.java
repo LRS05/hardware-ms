@@ -2,6 +2,8 @@ package com.hardwarehub.order_service.controller;
 
 import com.hardwarehub.order_service.client.ProductClient;
 import com.hardwarehub.order_service.client.dto.ProductResponseDTO;
+import com.hardwarehub.order_service.client.dto.ItemReservationDTO;
+import com.hardwarehub.order_service.client.dto.StockReservationRequestDTO;
 import com.hardwarehub.order_service.config.PostgresTestConfig;
 import com.hardwarehub.order_service.enums.ApiError;
 import com.hardwarehub.order_service.enums.OrderStatus;
@@ -30,6 +32,7 @@ import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.time.Instant;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -673,7 +676,7 @@ public class OrderControllerTest
     @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
     void checkout_whenStockReservationFails_thenReturnConflict()
     {
-        doThrow(new ProductOutOfStockException("Insufficient stock.")).when(productClient).decreaseStockById(1, 2);
+        doThrow(new ProductOutOfStockException("Insufficient stock.")).when(productClient).reserveStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
 
         customerRestTestClient.patch()
                 .uri("/active/checkout")

@@ -30,8 +30,16 @@ public class InternalSecurityConfig
                 .authorizeHttpRequests(auth -> auth
 
                         .requestMatchers(HttpMethod.GET, "/internal/products/{id}").hasAuthority("PRODUCT_READ")
-                        .requestMatchers(HttpMethod.PATCH, "/internal/products/{id}/decrease").hasAuthority("STOCK_DECREASE")
-                        .requestMatchers(HttpMethod.PATCH, "/internal/products/{id}/increase").hasAuthority("STOCK_INCREASE")
+
+                        .requestMatchers(HttpMethod.PATCH,
+                                "/internal/products/reserve",
+                                "/internal/products/{id}/decrease"
+                        ).hasAuthority("STOCK_DECREASE")
+
+                        .requestMatchers(HttpMethod.PATCH,
+                                "/internal/products/release",
+                                "/internal/products/{id}/increase"
+                        ).hasAuthority("STOCK_INCREASE")
 
                         .anyRequest().denyAll()
                 )
