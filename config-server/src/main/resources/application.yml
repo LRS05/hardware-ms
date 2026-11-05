@@ -5,10 +5,16 @@ spring:
   application:
     name: config-server
 
+  profiles:
+    active: native
+
   cloud:
     config:
       server:
-        git:
-          uri: https://github.com/LRS05/hardware-ms.git
-          default-label: main
-          search-paths: config-data
+        native:
+          search-locations: ${CONFIG_DATA_LOCATION}
+
+        # git:
+        #   uri: https://github.com/LRS05/hardware-ms.git
+        #   default-label: main
+        #   search-paths: config-data
