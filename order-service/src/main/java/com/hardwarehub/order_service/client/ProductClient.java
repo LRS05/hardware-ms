@@ -9,6 +9,7 @@ import com.hardwarehub.order_service.exception.ProductOutOfStockException;
 import com.hardwarehub.order_service.exception.ProductTimeoutException;
 import com.hardwarehub.order_service.exception.ProductUnavailableException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
@@ -26,7 +27,7 @@ public class ProductClient
     private final RestClient restClient;
 
     public ProductClient(
-            RestClient.Builder restClient,
+            @LoadBalanced RestClient.Builder restClient,
             @Value("${internal.auth.api-key}") String apiKey)
     {
         this.restClient = restClient
