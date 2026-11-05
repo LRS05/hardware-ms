@@ -27,3 +27,10 @@ jwt:
     expiration: ${JWT_ACCESS_EXPIRATION}
   refresh:
     expiration: ${JWT_REFRESH_EXPIRATION}
+
+dev:
+  admin:
+    enabled: ${DEV_ADMIN_ENABLED}
+    username: ${DEV_ADMIN_USERNAME}
+    email: ${DEV_ADMIN_EMAIL}
+    password: ${DEV_ADMIN_PASSWORD}
