@@ -1,6 +1,6 @@
 # Hardware - Microservices API
 
-A REST API for managing a hardware store, built with Java, Spring Boot and Spring Cloud. The project separates authentication, users, products and orders into microservices, with an API Gateway, service discovery and centralized configuration.
+A hardware store REST API built with Java, Spring Boot and Spring Cloud. Includes user, product and order services, an API Gateway, service discovery and centralized configuration.
 
 ## Features
 
@@ -16,6 +16,7 @@ A REST API for managing a hardware store, built with Java, Spring Boot and Sprin
 - Database migrations with Flyway.
 - Row locking for concurrent stock and order updates.
 - Controlled responses for product dependency errors and connection timeouts.
+- Docker Compose environment with PostgreSQL and the six applications.
 - Unit and integration tests with JUnit, Mockito, RestTestClient and Testcontainers.
 
 ## Technologies Used
@@ -34,6 +35,7 @@ A REST API for managing a hardware store, built with Java, Spring Boot and Sprin
 - Jakarta Bean Validation
 - MapStruct and Lombok
 - Maven
+- Docker and Docker Compose
 - JUnit, Mockito and MockRestServiceServer
 - RestTestClient and Testcontainers
 
@@ -50,9 +52,9 @@ A REST API for managing a hardware store, built with Java, Spring Boot and Sprin
 
 Each business service has its own PostgreSQL database: `user_db`, `product_db` and `order_db`.
 
-The gateway routes public API requests to the corresponding service. Order-service calls product-service directly through service discovery to retrieve products and modify stock.
+The gateway routes API requests. Order-service uses service discovery to call product-service for product details and stock updates.
 
-Configuration files are located in `config-data/`. By default, Config Server reads that directory from the `main` branch of this repository on GitHub.
+Config Server reads `config-data/` through its native backend. Compose mounts it read-only at `/config-data`; changes do not require a GitHub push. The Git backend is commented out.
 
 ## API Endpoints
 
@@ -67,7 +69,7 @@ Public requests use the API Gateway at `http://localhost:8080`.
 | POST | `/api/v1/auth/refresh` | Issue a new access token using the refresh cookie |
 | POST | `/api/v1/auth/logout` | Clear JWT cookies; authentication required |
 
-Authentication uses `access-token` and `refresh-token` cookies. Cookies are configured with `HttpOnly`, `Secure` and `SameSite=Strict`. Account for the `Secure` attribute when configuring a browser or HTTP client for local testing.
+The `access-token` and `refresh-token` cookies use `HttpOnly`, `Secure` and `SameSite=Strict`. Local HTTP clients must account for `Secure` cookies.
 
 ### Customer Profile
 
@@ -87,9 +89,9 @@ Authentication uses `access-token` and `refresh-token` cookies. Cookies are conf
 | GET | `/api/v1/products?category={category}` | Filter products by category |
 | GET | `/api/v1/products/{id}` | Retrieve a product |
 
-Product statuses are `ACTIVE`, `OUT_OF_STOCK` and `INACTIVE`. The public catalog and administrative endpoints apply different visibility rules.
+Product statuses: `ACTIVE`, `OUT_OF_STOCK` and `INACTIVE`. Visibility differs between public and administrative endpoints.
 
-Paginated customer and catalog endpoints use zero-based `page` and a default `size` of 20, with a maximum size of 100.
+Customer and catalog pagination uses zero-based `page`, default `size=20` and maximum `size=100`.
 
 ### Customer Orders
 
@@ -108,11 +110,11 @@ Paginated customer and catalog endpoints use zero-based `page` and a default `si
 | PATCH | `/api/v1/orders/active/checkout` | Reserve stock and move the order to PENDING |
 | PATCH | `/api/v1/orders/pending/reopen` | Release reserved stock and return the order to ACTIVE |
 
-Order statuses are `ACTIVE`, `PENDING`, `CANCELED` and `COMPLETED`. The internal order-completion endpoint exists in the source, but its payment-service security configuration is not enabled yet.
+Order statuses: `ACTIVE`, `PENDING`, `CANCELED` and `COMPLETED`. Payment integration is not enabled.
 
 ### Administration
 
-Administrative routes require ADMIN or STAFF. Some user operations are restricted further through method-level authorization.
+Administrative routes require ADMIN or STAFF; some user operations require ADMIN.
 
 | Endpoint | Description |
 | --- | --- |
@@ -126,20 +128,100 @@ Administrative routes require ADMIN or STAFF. Some user operations are restricte
 
 ### Internal Communication
 
-Product-service exposes these routes directly. They require an `X-API-Key` header with the corresponding permission and are not routed through the public gateway.
+Internal product routes require `X-API-Key` and the listed permission. They bypass the public gateway.
 
 | Service | Method | Endpoint | Permission |
 | --- | --- | --- | --- |
 | product-service | GET | `/internal/products/{id}` | `PRODUCT_READ` |
+| product-service | PATCH | `/internal/products/reserve` | `STOCK_DECREASE` |
+| product-service | PATCH | `/internal/products/release` | `STOCK_INCREASE` |
 | product-service | PATCH | `/internal/products/{id}/decrease` | `STOCK_DECREASE` |
 | product-service | PATCH | `/internal/products/{id}/increase` | `STOCK_INCREASE` |
 
-The order-service route `PATCH /internal/orders/{orderId}/complete` is reserved for payment integration. Its intended permission is `ORDER_COMPLETE`; the active security configuration currently denies access to this route.
+`PATCH /internal/orders/{orderId}/complete` is reserved for payment integration with `ORDER_COMPLETE`. Access is currently denied.
 
-ProductClient uses a 2-second connection timeout and a 5-second response timeout. Product business errors retain their 404 or 409 status. Other HTTP integration errors return 502, communication failures return 503, and timeouts return 504 from order-service. ProductClient does not add application-level retries.
+ProductClient timeouts: 2 seconds to connect, 5 seconds for a response. Order-service preserves product errors 404/409 and maps other HTTP errors to 502, connection failures to 503 and timeouts to 504. No application-level retries.
 
-Stock changes commit in product-service independently of the order-service transaction. A local order rollback does not undo stock changes already applied by product-service.
+Checkout and reopening use atomic stock batches in product-service. Order and stock transactions are separate: an order rollback does not undo committed stock changes.
 
 ## Docker Deployment
 
-Docker containerization and a Docker Compose setup are coming soon. Setup and execution instructions will be added when the containerized environment is ready.
+### Requirements
+
+- Docker Engine or Docker Desktop with Docker Compose v2 or later.
+- Port `8080` available on the host.
+- Internet access for the initial image and Maven dependency downloads.
+
+Java and Maven run inside Docker; no host installation is required.
+
+### Environment Variables
+
+From the repository root, copy the environment template:
+
+```bash
+cp .env.example .env
+```
+
+Replace the fictitious credentials in `.env` before starting. Do not commit this file.
+
+Keep these URLs for the Compose environment:
+
+| Variable | Value |
+| --- | --- |
+| `CONFIG_SERVER_URL` | `http://config-server:8888` |
+| `EUREKA_SERVER_URL` | `http://eureka-server:8761/eureka/` |
+| `USER_DB_URL` | `jdbc:postgresql://postgres:5432/user_db` |
+| `PRODUCT_DB_URL` | `jdbc:postgresql://postgres:5432/product_db` |
+| `ORDER_DB_URL` | `jdbc:postgresql://postgres:5432/order_db` |
+
+Use Compose service names for connections; `localhost` refers to the current container. Compose mounts `config-data/` and overrides `CONFIG_DATA_LOCATION` with `file:/config-data/`.
+
+Configure the remaining variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `POSTGRES_USER` | PostgreSQL user shared by the three service databases |
+| `POSTGRES_PASSWORD` | Password for that PostgreSQL user |
+| `JWT_SECRET_KEY` | Shared JWT signing secret, at least 32 UTF-8 bytes |
+| `JWT_ACCESS_EXPIRATION` | Access token lifetime in milliseconds; default example: `900000` (15 minutes) |
+| `JWT_REFRESH_EXPIRATION` | Refresh token lifetime in milliseconds; default example: `86400000` (24 hours) |
+| `PRODUCT_SERVICE_API_KEY` | Product-service internal authentication configuration |
+| `ORDER_SERVICE_API_KEY` | Identifies order-service when calling product-service |
+| `PAYMENT_SERVICE_API_KEY` | Reserved for payment integration; provide a placeholder while it remains unimplemented |
+
+PostgreSQL creates the three databases on first initialization and stores data in a named volume. Editing `.env` does not change existing database credentials.
+
+### Initial Administrator
+
+Registration creates CUSTOMER accounts. For an initial ADMIN, configure these variables in `.env` before the first start:
+
+```dotenv
+DEV_ADMIN_ENABLED=true
+DEV_ADMIN_USERNAME=admin
+DEV_ADMIN_EMAIL=admin@example.com
+DEV_ADMIN_PASSWORD=Admin123!
+```
+
+Replace the example credentials. User-service creates the ADMIN at startup with a BCrypt password. Log in at `/api/v1/auth/login`. Creation is skipped if any ADMIN exists or the username or email is taken.
+
+After creation, set `DEV_ADMIN_ENABLED=false` for subsequent starts. The account persists; changing the initial credentials does not update it.
+
+### Run
+
+From the repository root, build and start the environment:
+
+```bash
+docker compose up --build
+```
+
+Access the API at `http://localhost:8080`. Other services remain on the internal network. Wait for startup and Eureka registration before sending requests.
+
+### Shut Down
+
+In another terminal at the repository root, stop and remove the containers:
+
+```bash
+docker compose down
+```
+
+The PostgreSQL volume preserves data for the next start.
