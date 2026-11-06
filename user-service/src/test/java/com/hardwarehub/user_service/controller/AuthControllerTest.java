@@ -33,13 +33,13 @@ import java.util.Date;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
 @ActiveProfiles("test")
 @Import(PostgresTestConfig.class)
 @Sql(statements = "DELETE FROM users")
 @Sql("/data.sql")
 @Sql(statements = "ALTER TABLE users ALTER COLUMN id RESTART WITH 3")
+@SpringBootTest(properties = "spring.config.location=classpath:/application-test.properties", webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AuthControllerTest
 {
     @LocalServerPort

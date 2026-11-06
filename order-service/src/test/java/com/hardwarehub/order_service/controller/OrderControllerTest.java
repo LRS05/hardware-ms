@@ -38,12 +38,12 @@ import javax.crypto.spec.SecretKeySpec;
 
 import static org.mockito.Mockito.*;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
 @ActiveProfiles("test")
 @Import(PostgresTestConfig.class)
 @Sql(statements = {"DELETE FROM order_items", "DELETE FROM orders"})
 @Sql("/data.sql")
+@SpringBootTest(properties = "spring.config.location=classpath:/application-test.properties", webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class OrderControllerTest
 {
     @LocalServerPort

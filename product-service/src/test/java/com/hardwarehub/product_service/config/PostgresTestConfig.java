@@ -13,7 +13,7 @@ public class PostgresTestConfig
     public PostgreSQLContainer postgreSQLContainer()
     {
         return new PostgreSQLContainer("postgres:17-alpine")
-                .withDatabaseName("user_test_db")
+                .withDatabaseName("product_test_db")
                 .withUsername("test")
                 .withPassword("test");
     }

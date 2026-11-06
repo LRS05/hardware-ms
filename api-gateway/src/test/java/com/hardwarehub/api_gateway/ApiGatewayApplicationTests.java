@@ -2,12 +2,14 @@ package com.hardwarehub.api_gateway;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
-@SpringBootTest(properties = "jwt.secret-key=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+@ActiveProfiles("test")
+@SpringBootTest(properties = "spring.config.location=classpath:/application-test.properties")
 class ApiGatewayApplicationTests {
 
-	@Test
-	void contextLoads() {
-	}
+    @Test
+    void contextLoads() {
+    }
 
 }

@@ -7,9 +7,9 @@ import org.springframework.test.context.ActiveProfiles;
 
 import com.hardwarehub.product_service.config.PostgresTestConfig;
 
-@SpringBootTest
 @ActiveProfiles("test")
 @Import(PostgresTestConfig.class)
+@SpringBootTest(properties = "spring.config.location=classpath:/application-test.properties")
 class ProductServiceApplicationTests {
 
 	@Test
