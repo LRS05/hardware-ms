@@ -45,3 +45,7 @@ internal:
         - PRODUCT_READ
         - STOCK_INCREASE
         - STOCK_DECREASE
+
+demo:
+  data:
+    enabled: ${DEMO_DATA_ENABLED:false}

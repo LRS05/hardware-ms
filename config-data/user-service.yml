@@ -41,3 +41,11 @@ dev:
     username: ${DEV_ADMIN_USERNAME}
     email: ${DEV_ADMIN_EMAIL}
     password: ${DEV_ADMIN_PASSWORD}
+
+demo:
+  data:
+    enabled: ${DEMO_DATA_ENABLED:false}
+  customer:
+    username: ${DEMO_CUSTOMER_USERNAME}
+    email: ${DEMO_CUSTOMER_EMAIL}
+    password: ${DEMO_CUSTOMER_PASSWORD}
