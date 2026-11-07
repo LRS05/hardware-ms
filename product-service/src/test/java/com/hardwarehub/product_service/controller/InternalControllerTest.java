@@ -196,6 +196,44 @@ public class InternalControllerTest
     }
 
     @Test
+    void reserveStock_whenApiKeyIsInvalid_thenReturnUnauthorizedWithoutChangingStock()
+    {
+        int initialStock = productRepository.findById(1).orElseThrow().getStock();
+
+        RestTestClient.bindToServer()
+                .baseUrl("http://localhost:" + port + "/internal/products")
+                .build()
+                .patch()
+                .uri("/reserve")
+                .header("X-API-Key", "invalid-key")
+                .body(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))))
+                .exchange()
+                .expectStatus().isUnauthorized()
+                .expectBody()
+                .jsonPath("$.error").isEqualTo(ApiError.INVALID_API_KEY.name());
+
+        assertEquals(initialStock, productRepository.findById(1).orElseThrow().getStock());
+    }
+
+    @Test
+    void reserveStock_whenClientLacksPermission_thenReturnForbiddenWithoutChangingStock()
+    {
+        int initialStock = productRepository.findById(1).orElseThrow().getStock();
+
+        RestTestClient.bindToServer()
+                .baseUrl("http://localhost:" + port + "/internal/products")
+                .build()
+                .patch()
+                .uri("/reserve")
+                .header("X-API-Key", "test-read-only-key")
+                .body(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        assertEquals(initialStock, productRepository.findById(1).orElseThrow().getStock());
+    }
+
+    @Test
     void decreaseStockById_whenEnoughStockExists_thenReturnNoContent()
     {
         int productId = 1;
