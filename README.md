@@ -18,6 +18,7 @@ A hardware store REST API built with Java, Spring Boot and Spring Cloud. Include
 - Controlled responses for product dependency errors and connection timeouts.
 - Docker Compose environment with PostgreSQL and the six applications.
 - Unit and integration tests with JUnit, Mockito, RestTestClient and Testcontainers.
+- Automated builds, tests and Docker image builds on pushes and pull requests with GitHub Actions.
 
 ## Technologies Used
 
@@ -36,8 +37,11 @@ A hardware store REST API built with Java, Spring Boot and Spring Cloud. Include
 - MapStruct and Lombok
 - Maven
 - Docker and Docker Compose
+- GitHub Actions (CI)
 - JUnit, Mockito and MockRestServiceServer
 - RestTestClient and Testcontainers
+
+GitHub Actions runs `mvn clean verify` and builds Docker images on pushes and pull requests. It does not deploy services or run the distributed demo.
 
 ## Microservices
 
@@ -50,7 +54,7 @@ A hardware store REST API built with Java, Spring Boot and Spring Cloud. Include
 | `product-service` | Catalog, products and stock | 8082 |
 | `order-service` | Orders, items and product stock requests | 8083 |
 
-Each business service has its own PostgreSQL database: `user_db`, `product_db` and `order_db`.
+Services are separated by business responsibility. Each owns its PostgreSQL database (`user_db`, `product_db` and `order_db`) and migrations; cross-service access uses HTTP. Compose hosts all three databases on one PostgreSQL instance.
 
 The gateway routes API requests. Order-service uses service discovery to call product-service for product details and stock updates.
 
@@ -114,7 +118,7 @@ Customer and catalog pagination uses zero-based `page`, default `size=20` and ma
 | PATCH | `/api/v1/orders/active/checkout` | Reserve stock and move the order to PENDING |
 | PATCH | `/api/v1/orders/pending/reopen` | Release reserved stock and return the order to ACTIVE |
 
-Order statuses: `ACTIVE`, `PENDING`, `CANCELED` and `COMPLETED`. Payment integration is not enabled.
+Available flow: `ACTIVE` → checkout → `PENDING` → reopen → `ACTIVE`. `CANCELED` and `COMPLETED` exist in the model; public cancellation, payment confirmation and payment integration remain pending.
 
 ### Administration
 
@@ -132,7 +136,7 @@ Administrative routes require ADMIN or STAFF; some user operations require ADMIN
 
 ### Internal Communication
 
-Internal product routes require `X-API-Key` and the listed permission. They bypass the public gateway.
+Internal product routes use `X-API-Key` to identify the calling service and enforce the listed permission. They bypass the public gateway.
 
 | Service | Method | Endpoint | Permission |
 | --- | --- | --- | --- |
@@ -146,7 +150,31 @@ Internal product routes require `X-API-Key` and the listed permission. They bypa
 
 ProductClient timeouts: 2 seconds to connect, 5 seconds for a response. Order-service preserves product errors 404/409 and maps other HTTP errors to 502, connection failures to 503 and timeouts to 504. No application-level retries.
 
-Checkout and reopening use atomic stock batches in product-service. Order and stock transactions are separate: an order rollback does not undo committed stock changes.
+Row locks prevent concurrent writes to existing stock and order records from overwriting each other. Checkout and reopening use atomic stock batches in product-service. Order and stock transactions are separate: an order rollback does not undo committed stock changes.
+
+### Error Example
+
+For a product with stock 10, reserving 11 units through the internal API returns `409 Conflict`:
+
+```http
+PATCH /internal/products/reserve
+X-API-Key: <order-service-key>
+Content-Type: application/json
+
+{"items":[{"productId":1,"quantity":11}]}
+```
+
+Example response:
+
+```json
+{
+  "timestamp": "2026-11-07T12:00:00",
+  "error": "INSUFFICIENT_STOCK",
+  "status": 409,
+  "path": "/internal/products/reserve",
+  "message": "There's not enough stock of this product."
+}
+```
 
 ## Docker Deployment
 
@@ -219,6 +247,12 @@ docker compose up --build
 ```
 
 Access the API at `http://localhost:8080`. Other services remain on the internal network. Wait for startup and Eureka registration before sending requests.
+
+### Demo
+
+Import the [Postman collection](docs/postman/Hardware%20API%20-%20Demo.postman_collection.json), configure its credentials and run the requests in order against `http://localhost:8080`. Copy the created product ID into `productId`. The flow covers registration, login, catalog, cart, checkout and reopening. Check that stock changes from 10 to 9 after checkout and returns to 10 after reopening.
+
+For optional sample data, set `DEMO_DATA_ENABLED=true` and configure `DEMO_CUSTOMER_USERNAME`, `DEMO_CUSTOMER_EMAIL` and `DEMO_CUSTOMER_PASSWORD` in `.env` before startup. This creates a CUSTOMER and two products without modifying existing records. Administrator creation uses the separate `DEV_ADMIN_ENABLED` settings described above.
 
 ### Shut Down
 
