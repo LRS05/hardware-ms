@@ -38,13 +38,13 @@ public class JwtService
     public ResponseCookie generateAccessTokenCookie(UserEntity user)
     {
         String accessToken = buildToken(user, TokenType.ACCESS, accessExpiration);
-        return buildCookie("access-token", accessToken, 15);
+        return buildCookie("access-token", accessToken, accessExpiration);
     }
 
     public ResponseCookie generateRefreshTokenCookie(UserEntity user)
     {
         String refreshToken = buildToken(user, TokenType.REFRESH, refreshExpiration);
-        return buildCookie("refresh-token", refreshToken, 1440);
+        return buildCookie("refresh-token", refreshToken, refreshExpiration);
     }
 
     public boolean isValid(String token, UserEntity user)
@@ -123,14 +123,14 @@ public class JwtService
         }
     }
 
-    private ResponseCookie buildCookie(String name, String value, int durationOfMinutes)
+    private ResponseCookie buildCookie(String name, String value, long durationOfMillis)
     {
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
                 .secure(true)
                 .sameSite("Strict")
                 .path("/")
-                .maxAge(Duration.ofMinutes(durationOfMinutes))
+                .maxAge(Duration.ofMillis(durationOfMillis))
                 .build();
     }
 

@@ -71,6 +71,10 @@ Public requests use the API Gateway at `http://localhost:8080`.
 
 The `access-token` and `refresh-token` cookies use `HttpOnly`, `Secure` and `SameSite=Strict`. Local HTTP clients must account for `Secure` cookies.
 
+Authentication uses JWTs without server-side sessions. Refresh returns a new access token and keeps the same refresh token until its original expiration. Logout clears cookies without revoking issued tokens.
+
+Each cookie uses its JWT's configured lifetime. For example, `JWT_ACCESS_EXPIRATION=120000` gives both the access token and its cookie a lifetime of 2 minutes.
+
 ### Customer Profile
 
 | Method | Endpoint | Description |
