@@ -11,6 +11,9 @@ jobs:
   build:
     name: Build and Test
     runs-on: ubuntu-24.04
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      IMAGE_TAG: sha-${{ github.sha }}
 
     steps:
       - name: Checkout repository
@@ -31,3 +34,21 @@ jobs:
 
       - name: Build Docker images
         run: docker compose --env-file .env.example build
+
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push' && github.ref== 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Push Docker images
+        if: github.event_name == 'push' && github.ref== 'refs/heads/main'
+        run: |
+          docker compose --env-file .env.example push \
+            user-service \
+            product-service \
+            order-service \
+            api-gateway \
+            config-server \
+            eureka-server
