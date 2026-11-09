@@ -32,6 +32,9 @@ jobs:
       - name: Build and test
         run: mvn --batch-mode --no-transfer-progress clean verify
 
+      - name: Prepare Compose environment
+        run: cp .env.example .env
+
       - name: Build Docker images
         run: docker compose --env-file .env.example build
 
