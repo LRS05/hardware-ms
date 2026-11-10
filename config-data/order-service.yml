@@ -40,6 +40,7 @@ internal:
     api-key: ${ORDER_SERVICE_API_KEY}
   clients:
     payment-service:
-      apikey: ${PAYMENT_SERVICE_API_KEY}
+      api-key: ${PAYMENT_SERVICE_API_KEY}
       permissions:
+        - ORDER_READ
         - ORDER_COMPLETE

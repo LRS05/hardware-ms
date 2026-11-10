@@ -1,20 +1,27 @@
 package com.hardwarehub.order_service.config;
 
+import com.hardwarehub.order_service.security.ApiKeyAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-// TODO: Add API-key authentication before enabling for payment-service.
+@Configuration
 public class InternalSecurityConfig
 {
     @Bean
     @Order(1)
-    public SecurityFilterChain internalSecurityFilterChain(HttpSecurity httpSecurity)
+    public SecurityFilterChain internalSecurityFilterChain(
+            HttpSecurity httpSecurity,
+            ApiKeyAuthenticationFilter filter
+    )
     {
         return httpSecurity
                 .securityMatcher("/internal", "/internal/**")
@@ -24,9 +31,19 @@ public class InternalSecurityConfig
                 .requestCache(RequestCacheConfigurer::disable)
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.PATCH, "/internal/orders/{orderId}/complete").hasAuthority("ORDER_COMPLETE")
+                        .requestMatchers(HttpMethod.GET, "/internal/orders/{orderId}")
+                        .hasAuthority("ORDER_READ")
+
+                        .requestMatchers(HttpMethod.PATCH, "/internal/orders/{orderId}/complete")
+                        .hasAuthority("ORDER_COMPLETE")
+
                         .anyRequest().denyAll()
                 )
+                .exceptionHandling(exceptions -> exceptions
+                        .accessDeniedHandler((request, response, exception) ->
+                                response.setStatus(HttpStatus.FORBIDDEN.value()))
+                )
+                .addFilterBefore(filter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 }
