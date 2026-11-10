@@ -23,7 +23,7 @@ A hardware store REST API built with Java, Spring Boot and Spring Cloud. Include
 ## Technologies Used
 
 - Java 17
-- Spring Boot 4.1.1
+- Spring Boot 4.1.2
 - Spring Cloud 2025.1.3
 - Spring Cloud Gateway Server Web MVC
 - Spring Cloud Config
