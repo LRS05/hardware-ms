@@ -93,7 +93,7 @@ public class OrderServiceTest
         OrderEntity order = OrderFactory.activeOrder();
         order.setStatus(OrderStatus.PENDING);
 
-        OrderResponseDTO orderDTO = OrderFactory.activeOrderDTO();
+        OrderResponseDTO orderDTO = OrderFactory.pendingOrderDTO();
 
         when(orderRepository.findByUserIdAndStatus(userId, OrderStatus.PENDING)).thenReturn(Optional.of(order));
         when(orderMapper.entityToDTO(order)).thenReturn(orderDTO);
@@ -103,6 +103,7 @@ public class OrderServiceTest
 
         // Then
         assertEquals(orderDTO, result);
+        assertEquals(OrderStatus.PENDING, result.status());
 
         verify(orderRepository).findByUserIdAndStatus(userId, OrderStatus.PENDING);
         verify(orderMapper).entityToDTO(order);
@@ -201,6 +202,7 @@ public class OrderServiceTest
 
         OrderResponseDTO orderDTO = new OrderResponseDTO(
                 0,
+                OrderStatus.ACTIVE,
                 BigDecimal.ZERO,
                 List.of()
         );
@@ -487,7 +489,7 @@ public class OrderServiceTest
                 null,
                 null
         );
-        OrderResponseDTO orderDTO = OrderFactory.activeOrderDTO();
+        OrderResponseDTO orderDTO = OrderFactory.pendingOrderDTO();
 
         when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(productClient.getById(item.getProductId())).thenReturn(product);
@@ -499,6 +501,7 @@ public class OrderServiceTest
 
         // Then
         assertEquals(orderDTO, result);
+        assertEquals(OrderStatus.PENDING, result.status());
         assertEquals(OrderStatus.PENDING, order.getStatus());
         assertEquals(BigDecimal.valueOf(3000), item.getPrice());
         assertEquals(BigDecimal.valueOf(3000), order.getTotalPrice());

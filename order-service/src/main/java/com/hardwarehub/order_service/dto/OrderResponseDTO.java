@@ -1,13 +1,16 @@
 package com.hardwarehub.order_service.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.hardwarehub.order_service.enums.OrderStatus;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 public record OrderResponseDTO(
 
-        long id,
+        int id,
+
+        OrderStatus status,
 
         @JsonProperty("total_price")
         BigDecimal totalPrice,

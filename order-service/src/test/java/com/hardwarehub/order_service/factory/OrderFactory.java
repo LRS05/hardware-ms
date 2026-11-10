@@ -37,6 +37,13 @@ public class OrderFactory
         return entityToDTO(completeOrder());
     }
 
+    public static OrderResponseDTO pendingOrderDTO()
+    {
+        OrderEntity order = activeOrder();
+        order.setStatus(OrderStatus.PENDING);
+        return entityToDTO(order);
+    }
+
     public static OrderResponseDTO activeOrderDTO()
     {
         return entityToDTO(activeOrder());
@@ -86,6 +93,7 @@ public class OrderFactory
     {
         return new OrderResponseDTO(
                 order.getId(),
+                order.getStatus(),
                 order.getTotalPrice(),
                 itemsToDTO(order.getOrderItems())
         );

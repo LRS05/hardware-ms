@@ -132,6 +132,7 @@ public class OrderControllerTest
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
+                .jsonPath("$.status").isEqualTo("ACTIVE")
                 .jsonPath("$.id").isEqualTo(0)
                 .jsonPath("$.total_price").isEqualTo(0)
                 .jsonPath("$.order_items.length()").isEqualTo(0);
@@ -202,6 +203,7 @@ public class OrderControllerTest
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
+                .jsonPath("$.status").isEqualTo("ACTIVE")
                 .jsonPath("$.id").isEqualTo(2)
                 .jsonPath("$.total_price").isEqualTo(2000)
                 .jsonPath("$.order_items[0].quantity").isEqualTo(2);
@@ -221,6 +223,7 @@ public class OrderControllerTest
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
+                .jsonPath("$.status").isEqualTo("PENDING")
                 .jsonPath("$.id").isEqualTo(2)
                 .jsonPath("$.total_price").isEqualTo(2000)
                 .jsonPath("$.order_items[0].quantity").isEqualTo(2);
@@ -236,6 +239,7 @@ public class OrderControllerTest
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
+                .jsonPath("$.status").isEqualTo("COMPLETED")
                 .jsonPath("$.id").isEqualTo(1)
                 .jsonPath("$.total_price").isEqualTo(2000)
                 .jsonPath("$.order_items[0].product_name").isEqualTo("NVIDIA GTX 1080-TI");
@@ -251,6 +255,7 @@ public class OrderControllerTest
                 .expectBody()
                 .jsonPath("$.totalElements").isEqualTo(1)
                 .jsonPath("$.content.length()").isEqualTo(1)
+                .jsonPath("$.content[0].status").isEqualTo("COMPLETED")
                 .jsonPath("$.content[0].id").isEqualTo(1);
     }
 
@@ -297,6 +302,7 @@ public class OrderControllerTest
                 .expectBody()
                 .jsonPath("$.totalElements").isEqualTo(1)
                 .jsonPath("$.content.length()").isEqualTo(1)
+                .jsonPath("$.content[0].status").isEqualTo("COMPLETED")
                 .jsonPath("$.content[0].id").isEqualTo(1);
     }
 
@@ -312,6 +318,7 @@ public class OrderControllerTest
                 .expectBody()
                 .jsonPath("$.totalElements").isEqualTo(1)
                 .jsonPath("$.content.length()").isEqualTo(1)
+                .jsonPath("$.content[0].status").isEqualTo("ACTIVE")
                 .jsonPath("$.content[0].id").isEqualTo(2);
     }
 
@@ -549,6 +556,7 @@ public class OrderControllerTest
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
+                .jsonPath("$.status").isEqualTo("ACTIVE")
                 .jsonPath("$.id").isEqualTo(2)
                 .jsonPath("$.total_price").isEqualTo(2000)
                 .jsonPath("$.order_items[0].quantity").isEqualTo(2);
@@ -600,6 +608,7 @@ public class OrderControllerTest
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
+                .jsonPath("$.status").isEqualTo("PENDING")
                 .jsonPath("$.id").isEqualTo(2)
                 .jsonPath("$.total_price").isEqualTo(3000)
                 .jsonPath("$.order_items[0].quantity").isEqualTo(2);
