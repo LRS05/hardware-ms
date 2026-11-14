@@ -125,9 +125,13 @@ Available flows: `ACTIVE` → checkout → `PENDING` → reopen → `ACTIVE`, or
 
 ### Mercado Pago
 
-Send `{"provider":"MERCADO_PAGO"}` to the payment checkout endpoint and open the returned `checkoutUrl`. Mercado Pago sends notifications to `POST /api/v1/payments/webhooks/mercado-pago` through the gateway. This endpoint uses webhook signature validation instead of customer JWT authentication.
+With an order in `PENDING`:
 
-The service normalizes the provider ID to lowercase only for signature validation. It uses the original ID to find the local attempt and query Mercado Pago, then validates the reference, currency, amount and accredited status before recording the payment. Repeated notifications do not insert the same payment twice. Payment persistence commits before calling order-service; a later notification can retry order completion if that call fails. There is no background recovery when no later notification arrives.
+1. Send `POST /api/v1/orders/pending/payments/checkout` with `{"provider":"MERCADO_PAGO"}`.
+2. Open the returned `checkoutUrl` and pay with a test buyer account and a test card.
+3. Query `GET /api/v1/orders/{id}` using the local order ID. After the webhook is processed, its status should be `COMPLETED`.
+
+Configure Mercado Pago first using the [setup steps](#mercado-pago-setup).
 
 ### Administration
 
@@ -237,6 +241,27 @@ Configure the remaining variables:
 
 PostgreSQL creates the four databases on first initialization and stores data in a named volume. Editing `.env` does not change existing database credentials.
 
+### Mercado Pago Setup
+
+1. Create your application in [Mercado Pago Developers](https://www.mercadopago.com.ar/developers) using Checkout Pro via Orders API. Copy its Access Token to `MERCADO_PAGO_ACCESS_TOKEN` in `.env`.
+2. Make the API Gateway available through a public HTTPS URL.
+3. In Webhooks, select the matching environment (test or production), choose **Order (Mercado Pago)** and save the full URL:
+
+   ```text
+   https://<your-api-host>/api/v1/payments/webhooks/mercado-pago
+   ```
+
+4. Copy the webhook secret to `MERCADO_PAGO_WEBHOOK_SECRET` in `.env`, then start the services. Use credentials from the same application and environment.
+5. Create a payment checkout, open `checkoutUrl` and pay. Query the local order to confirm `COMPLETED`. For test payments, use a separate test buyer account and a test card.
+
+When running locally, you can expose the gateway with [cloudflared](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/):
+
+```bash
+cloudflared tunnel --url http://localhost:8080
+```
+
+Use the generated HTTPS hostname in the webhook URL and keep the tunnel running. Update the webhook URL if the hostname changes.
+
 ### Initial Administrator
 
 Registration creates CUSTOMER accounts. For an initial ADMIN, configure these variables in `.env` before the first start:
@@ -266,7 +291,7 @@ Access the API at `http://localhost:8080`. Other services remain on the internal
 
 Import the [Postman collection](docs/postman/Hardware%20API%20-%20Demo.postman_collection.json), configure its credentials and run the requests in order against `http://localhost:8080`. Copy the created product ID into `productId`. The flow covers registration, login, catalog, cart, checkout and reopening. Check that stock changes from 10 to 9 after checkout and returns to 10 after reopening.
 
-Run the `Mercado Pago - Demo` folder separately after the main demo. Copy the local ID returned by `Checkout order` into `orderId`, create the payment checkout, and open `checkoutUrl`. Use a separate test buyer account and a test card. Keep the services and public tunnel running; configure the current full HTTPS webhook URL ending in `/api/v1/payments/webhooks/mercado-pago` in Mercado Pago. After payment, use `Get order by ID` to verify `COMPLETED` from the automatic webhook. The simulator is not part of this automatic-flow check.
+For payments, run the `Mercado Pago - Demo` folder after the main demo. Copy the local ID returned by `Checkout order` into `orderId` and follow the [payment steps](#mercado-pago).
 
 For optional sample data, set `DEMO_DATA_ENABLED=true` and configure `DEMO_CUSTOMER_USERNAME`, `DEMO_CUSTOMER_EMAIL` and `DEMO_CUSTOMER_PASSWORD` in `.env` before startup. This creates a CUSTOMER and two products without modifying existing records. Administrator creation uses the separate `DEV_ADMIN_ENABLED` settings described above.
 
