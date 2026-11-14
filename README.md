@@ -1,6 +1,6 @@
 # Hardware - Microservices API
 
-A hardware store REST API built with Java, Spring Boot and Spring Cloud. Includes user, product and order services, an API Gateway, service discovery and centralized configuration.
+A hardware store REST API built with Java, Spring Boot and Spring Cloud. Includes user, product, order and payment services, an API Gateway, service discovery and centralized configuration.
 
 ## Features
 
@@ -12,11 +12,12 @@ A hardware store REST API built with Java, Spring Boot and Spring Cloud. Include
 - Product creation, updates, deactivation and stock management.
 - Customer orders with item management, price refresh, checkout and reopening.
 - Stock reservation during checkout and release when reopening an order.
+- Mercado Pago checkout and signed webhooks for recording approved payments and completing orders.
 - Internal service authentication using API keys and permissions.
 - Database migrations with Flyway.
 - Row locking for concurrent stock and order updates.
 - Controlled responses for product dependency errors and connection timeouts.
-- Docker Compose environment with PostgreSQL and the six applications.
+- Docker Compose environment with PostgreSQL and the seven applications.
 - Unit and integration tests with JUnit, Mockito, RestTestClient and Testcontainers.
 - Automated builds, tests and Docker image builds on pushes and pull requests with GitHub Actions.
 
@@ -53,10 +54,11 @@ GitHub Actions runs `mvn clean verify` and builds Docker images on pushes and pu
 | `user-service` | Authentication, profiles, users and roles | 8081 |
 | `product-service` | Catalog, products and stock | 8082 |
 | `order-service` | Orders, items and product stock requests | 8083 |
+| `payment-service` | Mercado Pago checkout, webhook validation and payment records | 8084 |
 
-Services are separated by business responsibility. Each owns its PostgreSQL database (`user_db`, `product_db` and `order_db`) and migrations; cross-service access uses HTTP. Compose hosts all three databases on one PostgreSQL instance.
+Services are separated by business responsibility. Each business service owns its PostgreSQL database (`user_db`, `product_db`, `order_db` and `payment_db`) and migrations; cross-service access uses HTTP. Compose hosts all four databases on one PostgreSQL instance.
 
-The gateway routes API requests. Order-service uses service discovery to call product-service for product details and stock updates.
+The gateway routes API requests. Order-service uses service discovery to call product-service for product details and stock updates, and payment-service for payment checkout and cancellation. Payment-service calls order-service to complete paid orders.
 
 Config Server reads `config-data/` through its native backend. Compose mounts it read-only at `/config-data`; changes do not require a GitHub push. The Git backend is commented out.
 
@@ -117,8 +119,15 @@ Customer and catalog pagination uses zero-based `page`, default `size=20` and ma
 | PATCH | `/api/v1/orders/active/clear` | Clear the active order |
 | PATCH | `/api/v1/orders/active/checkout` | Reserve stock and move the order to PENDING |
 | PATCH | `/api/v1/orders/pending/reopen` | Release reserved stock and return the order to ACTIVE |
+| POST | `/api/v1/orders/pending/payments/checkout` | Create or reuse a Mercado Pago checkout for the pending order |
 
-Available flow: `ACTIVE` → checkout → `PENDING` → reopen → `ACTIVE`. `CANCELED` and `COMPLETED` exist in the model; public cancellation, payment confirmation and payment integration remain pending.
+Available flows: `ACTIVE` → checkout → `PENDING` → reopen → `ACTIVE`, or `PENDING` → accredited Mercado Pago payment → `COMPLETED`. Reopening cancels any unpaid payment checkout before releasing stock. A processed payment cannot be canceled through reopening. Public order cancellation and expiration remain pending.
+
+### Mercado Pago
+
+Send `{"provider":"MERCADO_PAGO"}` to the payment checkout endpoint and open the returned `checkoutUrl`. Mercado Pago sends notifications to `POST /api/v1/payments/webhooks/mercado-pago` through the gateway. This endpoint uses webhook signature validation instead of customer JWT authentication.
+
+The service normalizes the provider ID to lowercase only for signature validation. It uses the original ID to find the local attempt and query Mercado Pago, then validates the reference, currency, amount and accredited status before recording the payment. Repeated notifications do not insert the same payment twice. Payment persistence commits before calling order-service; a later notification can retry order completion if that call fails. There is no background recovery when no later notification arrives.
 
 ### Administration
 
@@ -136,7 +145,7 @@ Administrative routes require ADMIN or STAFF; some user operations require ADMIN
 
 ### Internal Communication
 
-Internal product routes use `X-API-Key` to identify the calling service and enforce the listed permission. They bypass the public gateway.
+Internal routes use `X-API-Key` to identify the calling service and enforce the listed permission. They bypass the public gateway.
 
 | Service | Method | Endpoint | Permission |
 | --- | --- | --- | --- |
@@ -145,8 +154,10 @@ Internal product routes use `X-API-Key` to identify the calling service and enfo
 | product-service | PATCH | `/internal/products/release` | `STOCK_INCREASE` |
 | product-service | PATCH | `/internal/products/{id}/decrease` | `STOCK_DECREASE` |
 | product-service | PATCH | `/internal/products/{id}/increase` | `STOCK_INCREASE` |
-
-`PATCH /internal/orders/{orderId}/complete` is reserved for payment integration with `ORDER_COMPLETE`. Access is currently denied.
+| payment-service | POST | `/internal/payments/checkout` | `PAYMENT_CREATE` |
+| payment-service | POST | `/internal/payments/{orderId}/cancel` | `PAYMENT_CANCEL` |
+| order-service | GET | `/internal/orders/{orderId}?userId={userId}` | `ORDER_READ` |
+| order-service | PATCH | `/internal/orders/{orderId}/complete` | `ORDER_COMPLETE` |
 
 ProductClient timeouts: 2 seconds to connect, 5 seconds for a response. Order-service preserves product errors 404/409 and maps other HTTP errors to 502, connection failures to 503 and timeouts to 504. No application-level retries.
 
@@ -205,6 +216,7 @@ Keep these URLs for the Compose environment:
 | `USER_DB_URL` | `jdbc:postgresql://postgres:5432/user_db` |
 | `PRODUCT_DB_URL` | `jdbc:postgresql://postgres:5432/product_db` |
 | `ORDER_DB_URL` | `jdbc:postgresql://postgres:5432/order_db` |
+| `PAYMENT_DB_URL` | `jdbc:postgresql://postgres:5432/payment_db` |
 
 Use Compose service names for connections; `localhost` refers to the current container. Compose mounts `config-data/` and overrides `CONFIG_DATA_LOCATION` with `file:/config-data/`.
 
@@ -212,16 +224,18 @@ Configure the remaining variables:
 
 | Variable | Purpose |
 | --- | --- |
-| `POSTGRES_USER` | PostgreSQL user shared by the three service databases |
+| `POSTGRES_USER` | PostgreSQL user shared by the four service databases |
 | `POSTGRES_PASSWORD` | Password for that PostgreSQL user |
 | `JWT_SECRET_KEY` | Shared JWT signing secret, at least 32 UTF-8 bytes |
 | `JWT_ACCESS_EXPIRATION` | Access token lifetime in milliseconds; default example: `900000` (15 minutes) |
 | `JWT_REFRESH_EXPIRATION` | Refresh token lifetime in milliseconds; default example: `86400000` (24 hours) |
 | `PRODUCT_SERVICE_API_KEY` | Product-service internal authentication configuration |
-| `ORDER_SERVICE_API_KEY` | Identifies order-service when calling product-service |
-| `PAYMENT_SERVICE_API_KEY` | Reserved for payment integration; provide a placeholder while it remains unimplemented |
+| `ORDER_SERVICE_API_KEY` | Identifies order-service when calling product-service and payment-service |
+| `PAYMENT_SERVICE_API_KEY` | Identifies payment-service when calling order-service |
+| `MERCADO_PAGO_ACCESS_TOKEN` | Mercado Pago access token; use test credentials for the demo |
+| `MERCADO_PAGO_WEBHOOK_SECRET` | Secret from the application's webhook configuration; required for signature validation |
 
-PostgreSQL creates the three databases on first initialization and stores data in a named volume. Editing `.env` does not change existing database credentials.
+PostgreSQL creates the four databases on first initialization and stores data in a named volume. Editing `.env` does not change existing database credentials.
 
 ### Initial Administrator
 
@@ -251,6 +265,8 @@ Access the API at `http://localhost:8080`. Other services remain on the internal
 ### Demo
 
 Import the [Postman collection](docs/postman/Hardware%20API%20-%20Demo.postman_collection.json), configure its credentials and run the requests in order against `http://localhost:8080`. Copy the created product ID into `productId`. The flow covers registration, login, catalog, cart, checkout and reopening. Check that stock changes from 10 to 9 after checkout and returns to 10 after reopening.
+
+Run the `Mercado Pago - Demo` folder separately after the main demo. Copy the local ID returned by `Checkout order` into `orderId`, create the payment checkout, and open `checkoutUrl`. Use a separate test buyer account and a test card. Keep the services and public tunnel running; configure the current full HTTPS webhook URL ending in `/api/v1/payments/webhooks/mercado-pago` in Mercado Pago. After payment, use `Get order by ID` to verify `COMPLETED` from the automatic webhook. The simulator is not part of this automatic-flow check.
 
 For optional sample data, set `DEMO_DATA_ENABLED=true` and configure `DEMO_CUSTOMER_USERNAME`, `DEMO_CUSTOMER_EMAIL` and `DEMO_CUSTOMER_PASSWORD` in `.env` before startup. This creates a CUSTOMER and two products without modifying existing records. Administrator creation uses the separate `DEV_ADMIN_ENABLED` settings described above.
 

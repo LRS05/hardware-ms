@@ -1,10 +1,10 @@
 {
 	"info": {
-		"_postman_id": "13ff6c8e-4523-40d5-9216-71c597a20146",
+		"_postman_id": "3cf54b5a-6219-46e7-a4f4-c800b957b630",
 		"name": "Hardware API - Demo",
+		"description": "Set the collection credentials and run the top-level requests in order through the gateway. After creating the product, copy its id to productId. Stock should change from 10 to 9 after checkout and return to 10 after reopening. Use login cookies. For another run, change the customer username, email and product SKU. Run the Mercado Pago - Demo folder separately after the main demo; follow its instructions for test payment and automatic order completion. Check for environment variables overriding collection values.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
-		"_exporter_id": "40436462",
-		"description": "Set the collection credentials and run requests in order through the gateway. After creating the product, copy its id to productId. Stock should change from 10 to 9 after checkout and return to 10 after reopening. Use login cookies. For another run, change the customer username, email and product SKU. Check for environment variables overriding collection values."
+		"_exporter_id": "40436462"
 	},
 	"item": [
 		{
@@ -22,6 +22,15 @@
 					}
 				},
 				"url": "{{baseUrl}}/api/v1/auth/login"
+			},
+			"response": []
+		},
+		{
+			"name": "Get own profile (admin)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": "{{baseUrl}}/api/v1/admin/me"
 			},
 			"response": []
 		},
@@ -171,6 +180,105 @@
 				"url": "{{baseUrl}}/api/v1/products/{{productId}}"
 			},
 			"response": []
+		},
+		{
+			"name": "Refresh",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": "{{baseUrl}}/api/v1/auth/refresh"
+			},
+			"response": []
+		},
+		{
+			"name": "Mercado Pago - Demo",
+			"item": [
+				{
+					"name": "Login customer",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"{{customerUsername}}\",\n    \"password\": \"{{customerPassword}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{baseUrl}}/api/v1/auth/login"
+					},
+					"response": []
+				},
+				{
+					"name": "Get products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{baseUrl}}/api/v1/products"
+					},
+					"response": []
+				},
+				{
+					"name": "Add product to order",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"url": "{{baseUrl}}/api/v1/orders/active/items/products/{{productId}}"
+					},
+					"response": []
+				},
+				{
+					"name": "Checkout order",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"url": "{{baseUrl}}/api/v1/orders/active/checkout",
+						"description": "Copy the id from this response into the orderId collection variable. This is the local order ID, not Mercado Pago's provider order ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Create payment checkout",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"provider\": \"MERCADO_PAGO\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{baseUrl}}/api/v1/orders/pending/payments/checkout",
+						"description": "Open checkoutUrl from the response in a browser and pay with a separate Mercado Pago test buyer account and a test card. The payment notification is sent automatically by Mercado Pago; do not simulate a notification during this automatic-flow check."
+					},
+					"response": []
+				},
+				{
+					"name": "Get order by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"description": "Use the local orderId copied from Checkout order. After the automatic Mercado Pago webhook is processed, the response status must be COMPLETED. If it is still PENDING, inspect webhook delivery and service logs before attempting another payment.",
+						"url": "{{baseUrl}}/api/v1/orders/{{orderId}}"
+					},
+					"response": []
+				},
+				{
+					"name": "Get orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{baseUrl}}/api/v1/orders"
+					},
+					"response": []
+				}
+			],
+			"description": "Run this folder manually after the main demo has created the customer and an active product. Set customerUsername, customerPassword and productId, and keep login cookies enabled. The customer must have no pending order; the main demo leaves the cart active after reopening. Run the requests in this folder in order. After Checkout order, copy the returned local id into orderId. After Create payment checkout, open checkoutUrl in a browser and pay using a separate Mercado Pago test buyer account and a test card. Keep the services and public tunnel running, and configure the current full webhook URL in Mercado Pago. Wait for the automatic webhook, then use Get order by ID to confirm COMPLETED. Do not reopen the order after payment. Get orders is an optional history view. Environment variables with the same names override collection values."
 		}
 	],
 	"variable": [
@@ -201,6 +309,11 @@
 		},
 		{
 			"key": "productId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "orderId",
 			"value": "",
 			"type": "string"
 		}
