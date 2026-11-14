@@ -29,4 +29,12 @@ public class OrderClient
                 .retrieve()
                 .body(OrderResponseDTO.class);
     }
+
+    public void completeOrder(int orderId)
+    {
+        restClient.patch()
+                .uri("/{orderId}/complete", orderId)
+                .retrieve()
+                .toBodilessEntity();
+    }
 }

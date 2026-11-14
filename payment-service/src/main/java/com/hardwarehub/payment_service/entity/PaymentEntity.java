@@ -1,10 +1,9 @@
 package com.hardwarehub.payment_service.entity;
 
-import com.hardwarehub.payment_service.enums.PaymentStatus;
+import com.hardwarehub.payment_service.enums.PaymentProvider;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -25,9 +24,6 @@ public class PaymentEntity
     @Column(name = "order_id", nullable = false)
     private int orderId;
 
-    @Column(name = "user_id", nullable = false)
-    private int userId;
-
     @Column(precision = 10, scale = 2, nullable = false)
     private BigDecimal amount;
 
@@ -35,14 +31,13 @@ public class PaymentEntity
     private String currency;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private PaymentStatus status;
+    @Column(nullable = false, length = 32)
+    private PaymentProvider provider;
+
+    @Column(name = "provider_reference", nullable = false, length = 100)
+    private String providerReference;
 
     @CreationTimestamp
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    @Column(name = "completed_at", nullable = false)
+    private LocalDateTime completedAt;
 }

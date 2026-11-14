@@ -24,6 +24,13 @@ eureka:
 internal:
   auth:
     api-key: ${PAYMENT_SERVICE_API_KEY}
+  clients:
+    order-service:
+      api-key: ${ORDER_SERVICE_API_KEY}
+      permissions:
+        - PAYMENT_CREATE
+        - PAYMENT_CANCEL
 
-jwt:
-  secret-key: $JWT_SECRET_KEY}
+mercado-pago:
+  access-token: ${MERCADO_PAGO_ACCESS_TOKEN}
+  webhook-secret: ${MERCADO_PAGO_WEBHOOK_SECRET}

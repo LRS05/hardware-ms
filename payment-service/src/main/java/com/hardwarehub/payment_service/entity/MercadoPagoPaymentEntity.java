@@ -1,0 +1,54 @@
+package com.hardwarehub.payment_service.entity;
+
+import com.hardwarehub.payment_service.enums.PaymentStatus;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Entity
+@Builder
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+@Table(name = "mercado_pago_payments")
+public class MercadoPagoPaymentEntity
+{
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private int id;
+
+    @Column(name = "order_id", nullable = false)
+    private int orderId;
+
+    @Column(name = "idempotency_key", nullable = false, unique = true, length = 128)
+    private String idempotencyKey;
+
+    @Column(precision = 10, scale = 2, nullable = false)
+    private BigDecimal amount;
+
+    @Column(nullable = false, length = 3)
+    private String currency;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private PaymentStatus status;
+
+    @Column(name = "provider_order_id", unique = true, length = 100)
+    private String providerOrderId;
+
+    @Column(name = "checkout_url", columnDefinition = "TEXT")
+    private String checkoutUrl;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+}
