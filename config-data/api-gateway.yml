@@ -10,6 +10,12 @@ spring:
       server:
         webmvc:
           routes:
+            - id: mercado-pago-webhook
+              uri: lb://payment-service
+              predicates:
+                - Path=/api/v1/payments/webhooks/mercado-pago
+                - Method=POST
+
             - id: order-service-admin
               uri: lb://order-service
               predicates:

@@ -52,6 +52,7 @@ jobs:
             user-service \
             product-service \
             order-service \
+            payment-service \
             api-gateway \
             config-server \
             eureka-server

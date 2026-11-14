@@ -1,6 +1,7 @@
 package com.hardwarehub.order_service.service;
 
 import com.hardwarehub.order_service.client.ProductClient;
+import com.hardwarehub.order_service.client.PaymentClient;
 import com.hardwarehub.order_service.client.dto.ProductResponseDTO;
 import com.hardwarehub.order_service.client.dto.ItemReservationDTO;
 import com.hardwarehub.order_service.client.dto.StockReservationRequestDTO;
@@ -50,6 +51,9 @@ public class OrderServiceTest
 
     @Mock
     private ProductClient productClient;
+
+    @Mock
+    private PaymentClient paymentClient;
 
     @Mock
     private OrderItemRepository orderItemRepository;
@@ -122,6 +126,23 @@ public class OrderServiceTest
 
         // Then
         verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name());
+        verify(orderRepository).existsByUserIdAndStatus(userId, OrderStatus.PENDING);
+        verifyNoMoreInteractions(orderRepository);
+        verifyNoInteractions(orderMapper, productClient, orderItemRepository);
+    }
+
+    @Test
+    void checkout_whenPendingOrderExists_thenThrowPendingOrderExistsException()
+    {
+        int userId = 1;
+
+        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.empty());
+        when(orderRepository.existsByUserIdAndStatus(userId, OrderStatus.PENDING)).thenReturn(true);
+
+        assertThrows(PendingOrderExistsException.class, () -> orderService.checkout(userId));
+
+        verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name());
+        verify(orderRepository).existsByUserIdAndStatus(userId, OrderStatus.PENDING);
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
     }

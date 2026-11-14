@@ -1,6 +1,7 @@
 package com.hardwarehub.order_service.controller;
 
 import com.hardwarehub.order_service.client.ProductClient;
+import com.hardwarehub.order_service.client.PaymentClient;
 import com.hardwarehub.order_service.client.dto.ProductResponseDTO;
 import com.hardwarehub.order_service.client.dto.ItemReservationDTO;
 import com.hardwarehub.order_service.client.dto.StockReservationRequestDTO;
@@ -54,6 +55,9 @@ public class OrderControllerTest
 
     @MockitoBean
     private ProductClient productClient;
+
+    @MockitoBean
+    private PaymentClient paymentClient;
 
     private RestTestClient restTestClient;
 

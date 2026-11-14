@@ -1,21 +1,18 @@
 package com.hardwarehub.order_service.controller;
 
+import com.hardwarehub.order_service.dto.CreateCheckoutRequestDTO;
 import com.hardwarehub.order_service.dto.OrderResponseDTO;
+import com.hardwarehub.order_service.dto.PaymentLinkResponseDTO;
 import com.hardwarehub.order_service.enums.OrderStatus;
 import com.hardwarehub.order_service.service.OrderService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -50,6 +47,15 @@ public class OrderController
         orderService.clearActiveOrder(getUserId(jwt));
 
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/pending/payments/checkout")
+    public ResponseEntity<PaymentLinkResponseDTO> createPaymentCheckout(
+            @Valid @RequestBody CreateCheckoutRequestDTO requestDTO,
+            @AuthenticationPrincipal Jwt jwt
+    )
+    {
+        return ResponseEntity.ok(orderService.createPaymentCheckout(getUserId(jwt), requestDTO.provider()));
     }
 
     @GetMapping("/active")

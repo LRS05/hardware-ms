@@ -1,6 +1,7 @@
 package com.hardwarehub.order_service.concurrency;
 
 import com.hardwarehub.order_service.client.ProductClient;
+import com.hardwarehub.order_service.client.PaymentClient;
 import com.hardwarehub.order_service.client.dto.ProductResponseDTO;
 import com.hardwarehub.order_service.client.dto.ItemReservationDTO;
 import com.hardwarehub.order_service.client.dto.StockReservationRequestDTO;
@@ -89,6 +90,9 @@ public class OrderConcurrencyTest
 
     @MockitoBean
     private ProductClient productClient;
+
+    @MockitoBean
+    private PaymentClient paymentClient;
 
     private TransactionStatus transaction;
 
@@ -463,7 +467,7 @@ public class OrderConcurrencyTest
         List<Integer> statuses = new ArrayList<>(List.of(firstStatus, secondStatus));
         Collections.sort(statuses);
 
-        assertEquals(List.of(200, 400), statuses);
+        assertEquals(List.of(200, 409), statuses);
 
         OrderEntity updatedOrder = orderRepository.findById(orderId).orElseThrow();
         OrderItemEntity updatedItem = orderItemRepository.findById(2).orElseThrow();

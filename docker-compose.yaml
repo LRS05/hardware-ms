@@ -101,6 +101,27 @@ services:
       product-service:
         condition: service_started
 
+  payment-service:
+    image: ${DOCKER_USERNAME:-local}/hardware-store-payment-service:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    env_file:
+      - .env
+    environment:
+      CONFIG_SERVER_URL: ${CONFIG_SERVER_URL}
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL}
+      PAYMENT_DB_URL: ${PAYMENT_DB_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+      order-service:
+        condition: service_started
+
   api-gateway:
     image: ${DOCKER_USERNAME:-local}/hardware-store-api-gateway:${IMAGE_TAG:-dev}
     build:

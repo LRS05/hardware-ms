@@ -1,13 +1,17 @@
 package com.hardwarehub.order_service.service;
 
+import com.hardwarehub.order_service.client.PaymentClient;
 import com.hardwarehub.order_service.client.ProductClient;
 import com.hardwarehub.order_service.client.dto.ItemReservationDTO;
 import com.hardwarehub.order_service.client.dto.ProductResponseDTO;
 import com.hardwarehub.order_service.client.dto.StockReservationRequestDTO;
 import com.hardwarehub.order_service.dto.OrderResponseDTO;
+import com.hardwarehub.order_service.dto.PaymentLinkResponseDTO;
+import com.hardwarehub.order_service.dto.PaymentRequestDTO;
 import com.hardwarehub.order_service.entity.OrderEntity;
 import com.hardwarehub.order_service.entity.OrderItemEntity;
 import com.hardwarehub.order_service.enums.OrderStatus;
+import com.hardwarehub.order_service.enums.PaymentProvider;
 import com.hardwarehub.order_service.exception.*;
 import com.hardwarehub.order_service.mapper.OrderItemMapper;
 import com.hardwarehub.order_service.mapper.OrderMapper;
@@ -35,11 +39,15 @@ public class OrderService
     private final ProductClient productClient;
     private final OrderItemRepository orderItemRepository;
     private final OrderItemMapper orderItemMapper;
+    private final PaymentClient paymentClient;
 
     @Transactional(noRollbackFor = EmptyOrderException.class)
     public OrderResponseDTO checkout(int userId)
     {
-        OrderEntity order = findActiveOrderForUpdateOrThrow(userId);
+        OrderEntity order = orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())
+                .orElseThrow(() -> orderRepository.existsByUserIdAndStatus(userId, OrderStatus.PENDING)
+                        ? new PendingOrderExistsException("You have a pending order.")
+                        : new EmptyOrderException("Order is empty."));
 
         refreshOrderAndItemsPrice(order);
 
@@ -52,30 +60,12 @@ public class OrderService
         return orderMapper.entityToDTO(orderRepository.save(order));
     }
 
-    // Only used internally when a user completes a purchase.
-    @Transactional
-    public void complete(int orderId)
-    {
-        OrderEntity order = orderRepository.findByIdForUpdate(orderId)
-                .orElseThrow(() -> new OrderNotFoundException("Order not found."));
-
-        if (order.getStatus() == OrderStatus.COMPLETED)
-        {
-            return;
-        }
-
-        if (order.getStatus() != OrderStatus.PENDING)
-        {
-            throw new InvalidOrderStatusException("Only pending orders can be completed.");
-        }
-
-        order.setStatus(OrderStatus.COMPLETED);
-    }
-
     @Transactional
     public OrderResponseDTO reopen(int userId)
     {
         OrderEntity order = findPendingOrderForUpdateOrThrow(userId);
+
+        paymentClient.cancelCheckout(order.getId());
 
         releaseProductStock(order);
 
@@ -103,6 +93,36 @@ public class OrderService
         }
 
         order.setTotalPrice(BigDecimal.ZERO);
+    }
+
+    // Only used internally when a user completes a purchase.
+    @Transactional
+    public void complete(int orderId)
+    {
+        OrderEntity order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found."));
+
+        if (order.getStatus() == OrderStatus.COMPLETED)
+        {
+            return;
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING)
+        {
+            throw new InvalidOrderStatusException("Only pending orders can be completed.");
+        }
+
+        order.setStatus(OrderStatus.COMPLETED);
+    }
+
+    @Transactional
+    public PaymentLinkResponseDTO createPaymentCheckout(int userId, PaymentProvider provider)
+    {
+        OrderEntity order = findPendingOrderForUpdateOrThrow(userId);
+
+        return paymentClient.createCheckout(
+                new PaymentRequestDTO(order.getId(), order.getTotalPrice(), provider)
+        );
     }
 
     // Return an empty order without persisting it if the user has no active order.
