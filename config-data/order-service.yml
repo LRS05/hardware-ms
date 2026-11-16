@@ -44,3 +44,6 @@ internal:
       permissions:
         - ORDER_READ
         - ORDER_COMPLETE
+
+orders:
+  payment-timeout-minutes: 15

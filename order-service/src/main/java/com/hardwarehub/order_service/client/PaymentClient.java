@@ -47,7 +47,7 @@ public class PaymentClient
 
         if (responseDTO == null || responseDTO.checkoutUrl() == null || responseDTO.checkoutUrl().isBlank())
         {
-            throw new IllegalStateException("Mercado Pago returned no checkout URL.");
+            throw new IllegalStateException("Payment service returned no checkout URL.");
         }
 
         return responseDTO;

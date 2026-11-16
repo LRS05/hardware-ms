@@ -49,6 +49,14 @@ public class OrderController
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/pending/cancel")
+    public ResponseEntity<Void> cancel(@AuthenticationPrincipal Jwt jwt)
+    {
+        orderService.cancel(getUserId(jwt));
+
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/pending/payments/checkout")
     public ResponseEntity<PaymentLinkResponseDTO> createPaymentCheckout(
             @Valid @RequestBody CreateCheckoutRequestDTO requestDTO,

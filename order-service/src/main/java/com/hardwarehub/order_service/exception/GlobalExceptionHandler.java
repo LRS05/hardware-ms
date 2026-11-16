@@ -8,6 +8,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -69,6 +70,12 @@ public class GlobalExceptionHandler
     public ResponseEntity<ErrorResponseDTO> handleInvalidOrderStatusException(InvalidOrderStatusException e)
     {
         return sendErrorResponse(HttpStatus.CONFLICT, ApiError.INVALID_ORDER_STATUS, e.getMessage());
+    }
+
+    @ExceptionHandler(PaymentIntegrationException.class)
+    public ResponseEntity<ErrorResponseDTO> handlePaymentIntegrationException(PaymentIntegrationException e)
+    {
+        return sendErrorResponse(HttpStatus.BAD_GATEWAY, ApiError.PAYMENT_INTEGRATION, e.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

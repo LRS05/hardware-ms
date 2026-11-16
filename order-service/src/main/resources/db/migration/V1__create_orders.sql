@@ -3,6 +3,7 @@ CREATE TABLE orders (
     user_id INTEGER NOT NULL,
     status VARCHAR(255) NOT NULL,
     total_price NUMERIC(10, 2) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP(6) NOT NULL,
     updated_at TIMESTAMP(6) NOT NULL
 );
@@ -15,5 +16,20 @@ CREATE TABLE order_items (
     quantity INTEGER NOT NULL,
     order_id INTEGER NOT NULL,
 
-    CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id)
+    CONSTRAINT fk_order_items_order
+        FOREIGN KEY (order_id) REFERENCES orders(id),
+
+    CONSTRAINT ck_order_items_quantity_positive
+        CHECK (quantity > 0),
+
+    CONSTRAINT uq_order_items_product
+        UNIQUE (order_id, product_id)
 );
+
+CREATE UNIQUE INDEX uq_orders_open_user
+ON orders (user_id)
+WHERE status IN ('ACTIVE', 'PENDING');
+
+CREATE INDEX idx_orders_pending_expiration
+ON orders (expires_at)
+WHERE status = 'PENDING';

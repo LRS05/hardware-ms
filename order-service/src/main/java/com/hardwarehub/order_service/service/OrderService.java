@@ -18,12 +18,15 @@ import com.hardwarehub.order_service.mapper.OrderMapper;
 import com.hardwarehub.order_service.repository.OrderItemRepository;
 import com.hardwarehub.order_service.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,13 +44,13 @@ public class OrderService
     private final OrderItemMapper orderItemMapper;
     private final PaymentClient paymentClient;
 
+    @Value("${orders.payment-timeout-minutes}")
+    private long paymentTimeoutMinutes;
+
     @Transactional(noRollbackFor = EmptyOrderException.class)
     public OrderResponseDTO checkout(int userId)
     {
-        OrderEntity order = orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())
-                .orElseThrow(() -> orderRepository.existsByUserIdAndStatus(userId, OrderStatus.PENDING)
-                        ? new PendingOrderExistsException("You have a pending order.")
-                        : new EmptyOrderException("Order is empty."));
+        OrderEntity order = findActiveOrderForUpdateOrThrow(userId);
 
         refreshOrderAndItemsPrice(order);
 
@@ -55,7 +58,7 @@ public class OrderService
 
         reserveProductStock(order);
 
-        order.setStatus(OrderStatus.PENDING);
+        updateStatus(order, OrderStatus.PENDING);
 
         return orderMapper.entityToDTO(orderRepository.save(order));
     }
@@ -69,7 +72,7 @@ public class OrderService
 
         releaseProductStock(order);
 
-        order.setStatus(OrderStatus.ACTIVE);
+        updateStatus(order, OrderStatus.ACTIVE);
 
         return orderMapper.entityToDTO(orderRepository.save(order));
     }
@@ -112,7 +115,7 @@ public class OrderService
             throw new InvalidOrderStatusException("Only pending orders can be completed.");
         }
 
-        order.setStatus(OrderStatus.COMPLETED);
+        updateStatus(order, OrderStatus.COMPLETED);
     }
 
     @Transactional
@@ -120,9 +123,27 @@ public class OrderService
     {
         OrderEntity order = findPendingOrderForUpdateOrThrow(userId);
 
+        if (!order.getExpiresAt().isAfter(Instant.now()))
+        {
+            throw new InvalidOrderStatusException("The payment deadline has expired.");
+        }
+
         return paymentClient.createCheckout(
-                new PaymentRequestDTO(order.getId(), order.getTotalPrice(), provider)
+                new PaymentRequestDTO(order.getId(), order.getTotalPrice(), provider, order.getExpiresAt())
         );
+    }
+
+    @Transactional
+    public void cancel(int userId)
+    {
+        OrderEntity order = findPendingOrderForUpdateOrThrow(userId);
+
+        // Cancels existing payment checkouts for this order.
+        paymentClient.cancelCheckout(order.getId());
+
+        releaseProductStock(order);
+
+        updateStatus(order, OrderStatus.CANCELED);
     }
 
     // Return an empty order without persisting it if the user has no active order.
@@ -340,16 +361,13 @@ public class OrderService
                 .orElseThrow(() -> new ItemNotFoundException("Item not found."));
     }
 
-    private void validateOrderIsNotEmpty(OrderEntity order)
-    {
-        if (order.getOrderItems().isEmpty())
-        {
-            throw new EmptyOrderException("Order is empty.");
-        }
-    }
-
     private OrderEntity findActiveOrderForUpdateOrThrow(int userId)
     {
+        if (orderRepository.existsByUserIdAndStatus(userId, OrderStatus.PENDING))
+        {
+            throw new PendingOrderExistsException("You already have a pending order.");
+        }
+
         return orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())
                 .orElseThrow(() -> new EmptyOrderException("Order is empty."));
     }
@@ -358,5 +376,27 @@ public class OrderService
     {
         return orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name())
                 .orElseThrow(() -> new OrderNotFoundException("Pending order not found."));
+    }
+
+    private void validateOrderIsNotEmpty(OrderEntity order)
+    {
+        if (order.getOrderItems().isEmpty())
+        {
+            throw new EmptyOrderException("Order is empty.");
+        }
+    }
+
+    private void updateStatus(OrderEntity order, OrderStatus status)
+    {
+        order.setStatus(status);
+
+        if (status == OrderStatus.PENDING)
+        {
+            order.setExpiresAt(Instant.now().plus(Duration.ofMinutes(paymentTimeoutMinutes)));
+        }
+        else
+        {
+            order.setExpiresAt(null);
+        }
     }
 }
