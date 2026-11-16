@@ -91,6 +91,7 @@ public class MercadoPagoWebhookControllerTest
                 .amount(new BigDecimal("1500.00"))
                 .currency("ARS")
                 .status(PaymentStatus.PENDING)
+                .expiresAt(Instant.now().plusSeconds(900))
                 .build());
 
         String timestamp = String.valueOf(Instant.now().getEpochSecond());

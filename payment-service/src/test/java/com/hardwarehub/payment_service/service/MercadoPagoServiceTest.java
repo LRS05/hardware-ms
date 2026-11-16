@@ -1,5 +1,6 @@
 package com.hardwarehub.payment_service.service;
 
+import com.hardwarehub.payment_service.exception.InvalidPaymentRequestException;
 import com.hardwarehub.payment_service.exception.InvalidPaymentStateException;
 import com.hardwarehub.payment_service.exception.PaymentAttemptNotFoundException;
 import com.hardwarehub.payment_service.exception.PaymentProviderDataMismatchException;
@@ -33,6 +34,8 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -597,7 +600,7 @@ public class MercadoPagoServiceTest
     {
         // Given
         PaymentRequestDTO requestDTO = new PaymentRequestDTO(
-                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO);
+                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO, Instant.now().plusSeconds(900));
 
         MercadoPagoPaymentEntity payment = MercadoPagoPaymentEntity.builder()
                 .id(1)
@@ -642,7 +645,7 @@ public class MercadoPagoServiceTest
     {
         // Given
         PaymentRequestDTO requestDTO = new PaymentRequestDTO(
-                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO);
+                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO, Instant.now().plusSeconds(900));
 
         MercadoPagoPaymentEntity payment = MercadoPagoPaymentEntity.builder()
                 .id(1)
@@ -661,6 +664,7 @@ public class MercadoPagoServiceTest
                 new BigDecimal("1500.00"), BigDecimal.ZERO, "ARS");
 
         MercadoPagoPaymentEntity newPayment = MercadoPagoPaymentEntity.builder()
+                .expiresAt(requestDTO.expiresAt())
                 .id(2)
                 .orderId(10)
                 .idempotencyKey("new-key")
@@ -668,9 +672,6 @@ public class MercadoPagoServiceTest
                 .currency("ARS")
                 .status(PaymentStatus.PENDING)
                 .build();
-
-        MercadoPagoRequestDTO mercadoPagoRequestDTO = new MercadoPagoRequestDTO(
-                "online", "manual", "1500.00", "mp-attempt-2", "Order 10");
 
         MercadoPagoOrderResponseDTO newOrder = new MercadoPagoOrderResponseDTO(
                 "mp-order-456", "https://www.mercadopago.com.ar/new-checkout",
@@ -687,7 +688,7 @@ public class MercadoPagoServiceTest
         when(restClient.post()).thenReturn(requestBodySpec);
         when(requestBodySpec.uri("/v1/orders")).thenReturn(requestBodySpec);
         when(requestBodySpec.header("X-Idempotency-Key", "new-key")).thenReturn(requestBodySpec);
-        when(requestBodySpec.body(mercadoPagoRequestDTO)).thenReturn(requestBodySpec);
+        when(requestBodySpec.body(any(MercadoPagoRequestDTO.class))).thenReturn(requestBodySpec);
         when(requestBodySpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.body(MercadoPagoOrderResponseDTO.class)).thenReturn(responseDTO, newOrder);
 
@@ -709,6 +710,7 @@ public class MercadoPagoServiceTest
         assertEquals(10, attempt.getOrderId());
         assertEquals(new BigDecimal("1500.00"), attempt.getAmount());
         assertEquals("ARS", attempt.getCurrency());
+        assertEquals(requestDTO.expiresAt(), attempt.getExpiresAt());
         assertEquals(PaymentStatus.PENDING, attempt.getStatus());
         assertNotNull(attempt.getIdempotencyKey());
         assertNotEquals(payment.getIdempotencyKey(), attempt.getIdempotencyKey());
@@ -718,6 +720,17 @@ public class MercadoPagoServiceTest
         verify(mercadoPagoRepository).save(payment);
         verify(mercadoPagoRepository).save(newPayment);
         verify(requestBodySpec).header("X-Idempotency-Key", "new-key");
+        ArgumentCaptor<MercadoPagoRequestDTO> requestCaptor =
+                ArgumentCaptor.forClass(MercadoPagoRequestDTO.class);
+        verify(requestBodySpec).body(requestCaptor.capture());
+        MercadoPagoRequestDTO providerRequest = requestCaptor.getValue();
+        assertEquals("online", providerRequest.type());
+        assertEquals("manual", providerRequest.processingMode());
+        assertEquals("1500.00", providerRequest.totalAmount());
+        assertEquals("mp-attempt-2", providerRequest.externalReference());
+        assertEquals("Order 10", providerRequest.description());
+        long remainingSeconds = Duration.parse(providerRequest.expirationTime()).getSeconds();
+        assertTrue(remainingSeconds > 0 && remainingSeconds <= 900);
         verifyNoInteractions(orderClient);
     }
 
@@ -726,7 +739,7 @@ public class MercadoPagoServiceTest
     {
         // Given
         PaymentRequestDTO requestDTO = new PaymentRequestDTO(
-                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO);
+                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO, Instant.now().plusSeconds(900));
 
         MercadoPagoPaymentEntity payment = MercadoPagoPaymentEntity.builder()
                 .id(1)
@@ -769,7 +782,7 @@ public class MercadoPagoServiceTest
     {
         // Given
         PaymentRequestDTO requestDTO = new PaymentRequestDTO(
-                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO);
+                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO, Instant.now().plusSeconds(900));
 
         MercadoPagoPaymentEntity payment = MercadoPagoPaymentEntity.builder()
                 .id(1)
@@ -812,7 +825,7 @@ public class MercadoPagoServiceTest
     {
         // Given
         PaymentRequestDTO requestDTO = new PaymentRequestDTO(
-                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO);
+                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO, Instant.now().plusSeconds(900));
 
         MercadoPagoPaymentEntity payment = MercadoPagoPaymentEntity.builder()
                 .id(1)
@@ -855,7 +868,7 @@ public class MercadoPagoServiceTest
     {
         // Given
         PaymentRequestDTO requestDTO = new PaymentRequestDTO(
-                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO);
+                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO, Instant.now().plusSeconds(900));
 
         MercadoPagoPaymentEntity payment = MercadoPagoPaymentEntity.builder()
                 .id(1)
@@ -897,7 +910,7 @@ public class MercadoPagoServiceTest
     {
         // Given
         PaymentRequestDTO requestDTO = new PaymentRequestDTO(
-                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO);
+                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO, Instant.now().plusSeconds(900));
 
         MercadoPagoPaymentEntity payment = MercadoPagoPaymentEntity.builder()
                 .id(1)
@@ -929,5 +942,37 @@ public class MercadoPagoServiceTest
         verify(mercadoPagoRepository, never()).save(any());
         verify(mercadoPagoRepository, never()).saveAndFlush(any());
         verifyNoInteractions(orderClient);
+    }
+
+    @Test
+    void createCheckout_whenStoredAttemptHasExpired_thenDoNotCallProvider()
+    {
+        // Given
+        PaymentRequestDTO requestDTO = new PaymentRequestDTO(
+                10, new BigDecimal("1500.00"), PaymentProvider.MERCADO_PAGO,
+                Instant.now().plusSeconds(900)
+        );
+        MercadoPagoPaymentEntity payment = MercadoPagoPaymentEntity.builder()
+                .id(1)
+                .orderId(10)
+                .amount(new BigDecimal("1500.00"))
+                .currency("ARS")
+                .status(PaymentStatus.PENDING)
+                .expiresAt(Instant.now().minusSeconds(60))
+                .build();
+
+        when(paymentRepository.existsByOrderId(10)).thenReturn(false);
+        when(mercadoPagoRepository.findFirstByOrderIdAndStatusOrderByCreatedAtDesc(10, PaymentStatus.PENDING))
+                .thenReturn(Optional.of(payment));
+
+        // When
+        assertThrows(InvalidPaymentRequestException.class,
+                () -> mercadoPagoService.createCheckout(requestDTO));
+
+        // Then
+        verify(mercadoPagoRepository).findFirstByOrderIdAndStatusOrderByCreatedAtDesc(10, PaymentStatus.PENDING);
+        verifyNoInteractions(restClient, orderClient);
+        verify(mercadoPagoRepository, never()).save(any());
+        verify(mercadoPagoRepository, never()).saveAndFlush(any());
     }
 }

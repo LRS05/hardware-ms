@@ -1,5 +1,6 @@
 package com.hardwarehub.payment_service.service;
 
+import com.hardwarehub.payment_service.exception.InvalidPaymentRequestException;
 import com.hardwarehub.payment_service.exception.PaymentAlreadyCompletedException;
 import com.hardwarehub.payment_service.exception.UnsupportedPaymentProviderException;
 
@@ -9,6 +10,7 @@ import com.hardwarehub.payment_service.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -20,6 +22,8 @@ public class PaymentService
 
     public PaymentLinkResponseDTO createCheckout(PaymentRequestDTO requestDTO)
     {
+        validateOrderIsNotExpired(requestDTO);
+
         PaymentServiceProvider provider = providers.stream()
                 .filter(p -> p.getProvider() == requestDTO.provider())
                 .findFirst()
@@ -38,6 +42,14 @@ public class PaymentService
         for (PaymentServiceProvider provider : providers)
         {
             provider.cancelCheckout(orderId);
+        }
+    }
+
+    private void validateOrderIsNotExpired(PaymentRequestDTO requestDTO)
+    {
+        if (!requestDTO.expiresAt().isAfter(Instant.now()))
+        {
+            throw new InvalidPaymentRequestException("The order has expired.");
         }
     }
 }

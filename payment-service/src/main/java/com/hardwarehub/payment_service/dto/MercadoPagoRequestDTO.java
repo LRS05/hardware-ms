@@ -17,7 +17,9 @@ public record MercadoPagoRequestDTO(
         @JsonProperty("external_reference")
         String externalReference,
 
-        String description
+        String description,
 
+        @JsonProperty("expiration_time")
+        String expirationTime
 ) {
 }

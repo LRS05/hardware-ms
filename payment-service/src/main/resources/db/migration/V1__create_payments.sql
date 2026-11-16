@@ -18,6 +18,6 @@ CREATE TABLE mercado_pago_payments (
     status VARCHAR(255) NOT NULL,
     mercado_pago_order_id VARCHAR(100) UNIQUE,
     checkout_url TEXT,
-    created_at TIMESTAMP(6) NOT NULL,
-    updated_at TIMESTAMP(6) NOT NULL
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL
 );
