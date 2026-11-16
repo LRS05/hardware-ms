@@ -136,12 +136,10 @@ public class OrderServiceTest
     {
         int userId = 1;
 
-        when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.empty());
         when(orderRepository.existsByUserIdAndStatus(userId, OrderStatus.PENDING)).thenReturn(true);
 
         assertThrows(PendingOrderExistsException.class, () -> orderService.checkout(userId));
 
-        verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name());
         verify(orderRepository).existsByUserIdAndStatus(userId, OrderStatus.PENDING);
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
@@ -193,6 +191,7 @@ public class OrderServiceTest
         assertThrows(EmptyOrderException.class, () -> orderService.refreshActiveOrder(userId));
 
         // Then
+        verify(orderRepository).existsByUserIdAndStatus(userId, OrderStatus.PENDING);
         verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name());
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
@@ -210,6 +209,7 @@ public class OrderServiceTest
         assertThrows(EmptyOrderException.class, () -> orderService.clearActiveOrder(userId));
 
         // Then
+        verify(orderRepository).existsByUserIdAndStatus(userId, OrderStatus.PENDING);
         verify(orderRepository).findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name());
         verifyNoMoreInteractions(orderRepository);
         verifyNoInteractions(orderMapper, productClient, orderItemRepository);
