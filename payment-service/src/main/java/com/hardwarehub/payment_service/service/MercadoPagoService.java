@@ -241,8 +241,30 @@ public class MercadoPagoService implements PaymentServiceProvider
 
     private void cancelPaymentAttempt(MercadoPagoPaymentEntity payment)
     {
-        cancelProviderOrder(payment);
+        MercadoPagoOrderResponseDTO providerOrder = fetchMercadoPagoOrderById(payment.getProviderOrderId());
+
+        validateOrderMatchesPaymentAttempt(payment, providerOrder);
+
+        if (providerOrder.status() != MercadoPagoOrderStatus.CANCELED)
+        {
+            validateProviderOrderCanBeCanceled(providerOrder);
+            cancelProviderOrder(payment);
+        }
+
         markAttemptCanceled(payment);
+    }
+
+    private void validateProviderOrderCanBeCanceled(MercadoPagoOrderResponseDTO providerOrder)
+    {
+        if (isPaymentAccredited(providerOrder))
+        {
+            throw new PaymentAlreadyCompletedException("The order has already been paid.");
+        }
+
+        if (providerOrder.status() != MercadoPagoOrderStatus.CREATED)
+        {
+            throw new InvalidPaymentStateException("The existing checkout cannot be canceled in its current state.");
+        }
     }
 
     private void cancelProviderOrder(MercadoPagoPaymentEntity payment)

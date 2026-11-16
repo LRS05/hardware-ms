@@ -2,12 +2,14 @@ package com.hardwarehub.payment_service.service;
 
 import com.hardwarehub.payment_service.exception.InvalidPaymentRequestException;
 import com.hardwarehub.payment_service.exception.InvalidPaymentStateException;
+import com.hardwarehub.payment_service.exception.PaymentAlreadyCompletedException;
 import com.hardwarehub.payment_service.exception.PaymentAttemptNotFoundException;
 import com.hardwarehub.payment_service.exception.PaymentProviderDataMismatchException;
 import com.hardwarehub.payment_service.exception.PaymentProviderIntegrationException;
 
 import com.hardwarehub.payment_service.client.OrderClient;
 import com.hardwarehub.payment_service.dto.MercadoPagoOrderResponseDTO;
+import com.hardwarehub.payment_service.dto.MercadoPagoCancelResponseDTO;
 import com.hardwarehub.payment_service.dto.MercadoPagoRequestDTO;
 import com.hardwarehub.payment_service.dto.PaymentLinkResponseDTO;
 import com.hardwarehub.payment_service.dto.PaymentRequestDTO;
@@ -37,6 +39,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -974,5 +977,168 @@ public class MercadoPagoServiceTest
         verifyNoInteractions(restClient, orderClient);
         verify(mercadoPagoRepository, never()).save(any());
         verify(mercadoPagoRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void cancelCheckout_whenProviderOrderIsAlreadyCanceled_thenUpdateLocalAttemptWithoutCancelingAgain()
+    {
+        // Given
+        MercadoPagoPaymentEntity payment = MercadoPagoPaymentEntity.builder()
+                .id(1)
+                .orderId(10)
+                .providerOrderId("mp-order-123")
+                .idempotencyKey("original-key")
+                .amount(new BigDecimal("1500.00"))
+                .currency("ARS")
+                .status(PaymentStatus.PENDING)
+                .expiresAt(Instant.now().plusSeconds(900))
+                .build();
+
+        MercadoPagoOrderResponseDTO providerOrder = new MercadoPagoOrderResponseDTO(
+                "mp-order-123", null, MercadoPagoOrderStatus.CANCELED,
+                MercadoPagoOrderStatusDetail.CANCELED, "mp-attempt-1",
+                new BigDecimal("1500.00"), BigDecimal.ZERO, "ARS"
+        );
+
+        when(paymentRepository.existsByOrderId(10)).thenReturn(false);
+        when(mercadoPagoRepository.findAllByOrderIdOrderByCreatedAtDesc(10)).thenReturn(List.of(payment));
+        when(restClient.get()).thenReturn(requestSpec);
+        when(requestSpec.uri("/v1/orders/{id}", "mp-order-123")).thenReturn(requestSpec);
+        when(requestSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.body(MercadoPagoOrderResponseDTO.class)).thenReturn(providerOrder);
+
+        // When
+        mercadoPagoService.cancelCheckout(10);
+
+        // Then
+        assertEquals(PaymentStatus.CANCELLED, payment.getStatus());
+        verify(mercadoPagoRepository).save(payment);
+        verify(restClient, never()).post();
+        verifyNoInteractions(orderClient);
+    }
+
+    @Test
+    void cancelCheckout_whenProviderOrderIsCreated_thenCancelProviderOrderAndUpdateLocalAttempt()
+    {
+        // Given
+        MercadoPagoPaymentEntity payment = MercadoPagoPaymentEntity.builder()
+                .id(1)
+                .orderId(10)
+                .providerOrderId("mp-order-123")
+                .idempotencyKey("original-key")
+                .amount(new BigDecimal("1500.00"))
+                .currency("ARS")
+                .status(PaymentStatus.PENDING)
+                .expiresAt(Instant.now().plusSeconds(900))
+                .build();
+
+        MercadoPagoOrderResponseDTO providerOrder = new MercadoPagoOrderResponseDTO(
+                "mp-order-123", null, MercadoPagoOrderStatus.CREATED,
+                MercadoPagoOrderStatusDetail.CREATED, "mp-attempt-1",
+                new BigDecimal("1500.00"), BigDecimal.ZERO, "ARS"
+        );
+
+        when(paymentRepository.existsByOrderId(10)).thenReturn(false);
+        when(mercadoPagoRepository.findAllByOrderIdOrderByCreatedAtDesc(10)).thenReturn(List.of(payment));
+        when(restClient.get()).thenReturn(requestSpec);
+        when(requestSpec.uri("/v1/orders/{id}", "mp-order-123")).thenReturn(requestSpec);
+        when(requestSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.body(MercadoPagoOrderResponseDTO.class)).thenReturn(providerOrder);
+
+        MercadoPagoCancelResponseDTO cancellation = new MercadoPagoCancelResponseDTO(
+                "mp-order-123", MercadoPagoOrderStatus.CANCELED
+        );
+        when(restClient.post()).thenReturn(requestBodySpec);
+        when(requestBodySpec.uri("/v1/orders/{orderId}/cancel", "mp-order-123")).thenReturn(requestBodySpec);
+        when(requestBodySpec.header(eq("X-Idempotency-Key"), anyString())).thenReturn(requestBodySpec);
+        when(requestBodySpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.body(MercadoPagoCancelResponseDTO.class)).thenReturn(cancellation);
+
+        // When
+        mercadoPagoService.cancelCheckout(10);
+
+        // Then
+        assertEquals(PaymentStatus.CANCELLED, payment.getStatus());
+        verify(mercadoPagoRepository).save(payment);
+        verify(restClient).post();
+        verifyNoInteractions(orderClient);
+    }
+
+    @Test
+    void cancelCheckout_whenProviderOrderIsProcessing_thenKeepLocalAttemptPending()
+    {
+        // Given
+        MercadoPagoPaymentEntity payment = MercadoPagoPaymentEntity.builder()
+                .id(1)
+                .orderId(10)
+                .providerOrderId("mp-order-123")
+                .idempotencyKey("original-key")
+                .amount(new BigDecimal("1500.00"))
+                .currency("ARS")
+                .status(PaymentStatus.PENDING)
+                .expiresAt(Instant.now().plusSeconds(900))
+                .build();
+
+        MercadoPagoOrderResponseDTO providerOrder = new MercadoPagoOrderResponseDTO(
+                "mp-order-123", null, MercadoPagoOrderStatus.PROCESSING,
+                MercadoPagoOrderStatusDetail.CREATED, "mp-attempt-1",
+                new BigDecimal("1500.00"), BigDecimal.ZERO, "ARS"
+        );
+
+        when(paymentRepository.existsByOrderId(10)).thenReturn(false);
+        when(mercadoPagoRepository.findAllByOrderIdOrderByCreatedAtDesc(10)).thenReturn(List.of(payment));
+        when(restClient.get()).thenReturn(requestSpec);
+        when(requestSpec.uri("/v1/orders/{id}", "mp-order-123")).thenReturn(requestSpec);
+        when(requestSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.body(MercadoPagoOrderResponseDTO.class)).thenReturn(providerOrder);
+
+        // When
+        assertThrows(InvalidPaymentStateException.class,
+                () -> mercadoPagoService.cancelCheckout(10));
+
+        // Then
+        assertEquals(PaymentStatus.PENDING, payment.getStatus());
+        verify(mercadoPagoRepository, never()).save(any());
+        verify(restClient, never()).post();
+        verifyNoInteractions(orderClient);
+    }
+
+    @Test
+    void cancelCheckout_whenProviderOrderIsAccredited_thenRejectCancellation()
+    {
+        // Given
+        MercadoPagoPaymentEntity payment = MercadoPagoPaymentEntity.builder()
+                .id(1)
+                .orderId(10)
+                .providerOrderId("mp-order-123")
+                .idempotencyKey("original-key")
+                .amount(new BigDecimal("1500.00"))
+                .currency("ARS")
+                .status(PaymentStatus.PENDING)
+                .expiresAt(Instant.now().plusSeconds(900))
+                .build();
+
+        MercadoPagoOrderResponseDTO providerOrder = new MercadoPagoOrderResponseDTO(
+                "mp-order-123", null, MercadoPagoOrderStatus.PROCESSED,
+                MercadoPagoOrderStatusDetail.ACCREDITED, "mp-attempt-1",
+                new BigDecimal("1500.00"), BigDecimal.ZERO, "ARS"
+        );
+
+        when(paymentRepository.existsByOrderId(10)).thenReturn(false);
+        when(mercadoPagoRepository.findAllByOrderIdOrderByCreatedAtDesc(10)).thenReturn(List.of(payment));
+        when(restClient.get()).thenReturn(requestSpec);
+        when(requestSpec.uri("/v1/orders/{id}", "mp-order-123")).thenReturn(requestSpec);
+        when(requestSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.body(MercadoPagoOrderResponseDTO.class)).thenReturn(providerOrder);
+
+        // When
+        assertThrows(PaymentAlreadyCompletedException.class,
+                () -> mercadoPagoService.cancelCheckout(10));
+
+        // Then
+        assertEquals(PaymentStatus.PENDING, payment.getStatus());
+        verify(mercadoPagoRepository, never()).save(any());
+        verify(restClient, never()).post();
+        verifyNoInteractions(orderClient);
     }
 }
