@@ -1,5 +1,10 @@
 package com.hardwarehub.payment_service.service;
 
+import com.hardwarehub.payment_service.exception.InvalidPaymentStateException;
+import com.hardwarehub.payment_service.exception.PaymentAttemptNotFoundException;
+import com.hardwarehub.payment_service.exception.PaymentProviderDataMismatchException;
+import com.hardwarehub.payment_service.exception.PaymentProviderIntegrationException;
+
 import com.hardwarehub.payment_service.client.OrderClient;
 import com.hardwarehub.payment_service.dto.MercadoPagoOrderResponseDTO;
 import com.hardwarehub.payment_service.dto.MercadoPagoRequestDTO;
@@ -241,7 +246,7 @@ public class MercadoPagoServiceTest
     }
 
     @Test
-    void processNotification_whenPaymentAttemptDoesNotExist_thenThrowIllegalStateException()
+    void processNotification_whenPaymentAttemptDoesNotExist_thenThrowPaymentAttemptNotFoundException()
     {
         // Given
         String providerOrderId = "mp-order-123";
@@ -250,7 +255,7 @@ public class MercadoPagoServiceTest
         when(mercadoPagoRepository.findByProviderOrderId(providerOrderId)).thenReturn(Optional.empty());
 
         // When
-        assertThrows(IllegalStateException.class,
+        assertThrows(PaymentAttemptNotFoundException.class,
                 () -> mercadoPagoService.processNotification(providerOrderId));
 
         // Then
@@ -259,7 +264,7 @@ public class MercadoPagoServiceTest
     }
 
     @Test
-    void processNotification_whenProviderOrderIdDoesNotMatch_thenThrowIllegalStateException()
+    void processNotification_whenProviderOrderIdDoesNotMatch_thenThrowPaymentProviderIntegrationException()
     {
         // Given
         String providerOrderId = "mp-order-123";
@@ -286,7 +291,7 @@ public class MercadoPagoServiceTest
         when(responseSpec.body(MercadoPagoOrderResponseDTO.class)).thenReturn(responseDTO);
 
         // When
-        assertThrows(IllegalStateException.class,
+        assertThrows(PaymentProviderIntegrationException.class,
                 () -> mercadoPagoService.processNotification(providerOrderId));
 
         // Then
@@ -297,7 +302,7 @@ public class MercadoPagoServiceTest
     }
 
     @Test
-    void processNotification_whenReferenceDoesNotMatch_thenThrowIllegalStateException()
+    void processNotification_whenReferenceDoesNotMatch_thenThrowPaymentProviderDataMismatchException()
     {
         // Given
         String providerOrderId = "mp-order-123";
@@ -324,7 +329,7 @@ public class MercadoPagoServiceTest
         when(responseSpec.body(MercadoPagoOrderResponseDTO.class)).thenReturn(responseDTO);
 
         // When
-        assertThrows(IllegalStateException.class,
+        assertThrows(PaymentProviderDataMismatchException.class,
                 () -> mercadoPagoService.processNotification(providerOrderId));
 
         // Then
@@ -335,7 +340,7 @@ public class MercadoPagoServiceTest
     }
 
     @Test
-    void processNotification_whenCurrencyDoesNotMatch_thenThrowIllegalStateException()
+    void processNotification_whenCurrencyDoesNotMatch_thenThrowPaymentProviderDataMismatchException()
     {
         // Given
         String providerOrderId = "mp-order-123";
@@ -362,7 +367,7 @@ public class MercadoPagoServiceTest
         when(responseSpec.body(MercadoPagoOrderResponseDTO.class)).thenReturn(responseDTO);
 
         // When
-        assertThrows(IllegalStateException.class,
+        assertThrows(PaymentProviderDataMismatchException.class,
                 () -> mercadoPagoService.processNotification(providerOrderId));
 
         // Then
@@ -373,7 +378,7 @@ public class MercadoPagoServiceTest
     }
 
     @Test
-    void processNotification_whenTotalAmountDoesNotMatch_thenThrowIllegalStateException()
+    void processNotification_whenTotalAmountDoesNotMatch_thenThrowPaymentProviderDataMismatchException()
     {
         // Given
         String providerOrderId = "mp-order-123";
@@ -400,7 +405,7 @@ public class MercadoPagoServiceTest
         when(responseSpec.body(MercadoPagoOrderResponseDTO.class)).thenReturn(responseDTO);
 
         // When
-        assertThrows(IllegalStateException.class,
+        assertThrows(PaymentProviderDataMismatchException.class,
                 () -> mercadoPagoService.processNotification(providerOrderId));
 
         // Then
@@ -411,7 +416,7 @@ public class MercadoPagoServiceTest
     }
 
     @Test
-    void processNotification_whenPaidAmountDoesNotMatch_thenThrowIllegalStateException()
+    void processNotification_whenPaidAmountDoesNotMatch_thenThrowPaymentProviderDataMismatchException()
     {
         // Given
         String providerOrderId = "mp-order-123";
@@ -438,7 +443,7 @@ public class MercadoPagoServiceTest
         when(responseSpec.body(MercadoPagoOrderResponseDTO.class)).thenReturn(responseDTO);
 
         // When
-        assertThrows(IllegalStateException.class,
+        assertThrows(PaymentProviderDataMismatchException.class,
                 () -> mercadoPagoService.processNotification(providerOrderId));
 
         // Then
@@ -748,7 +753,7 @@ public class MercadoPagoServiceTest
         when(responseSpec.body(MercadoPagoOrderResponseDTO.class)).thenReturn(responseDTO);
 
         // When
-        assertThrows(IllegalStateException.class, () -> mercadoPagoService.createCheckout(requestDTO));
+        assertThrows(InvalidPaymentStateException.class, () -> mercadoPagoService.createCheckout(requestDTO));
 
         // Then
         assertEquals(PaymentStatus.PENDING, payment.getStatus());
@@ -791,7 +796,7 @@ public class MercadoPagoServiceTest
         when(responseSpec.body(MercadoPagoOrderResponseDTO.class)).thenReturn(responseDTO);
 
         // When
-        assertThrows(IllegalStateException.class, () -> mercadoPagoService.createCheckout(requestDTO));
+        assertThrows(InvalidPaymentStateException.class, () -> mercadoPagoService.createCheckout(requestDTO));
 
         // Then
         assertEquals(PaymentStatus.PENDING, payment.getStatus());
@@ -834,7 +839,7 @@ public class MercadoPagoServiceTest
         when(responseSpec.body(MercadoPagoOrderResponseDTO.class)).thenReturn(responseDTO);
 
         // When
-        assertThrows(IllegalStateException.class, () -> mercadoPagoService.createCheckout(requestDTO));
+        assertThrows(InvalidPaymentStateException.class, () -> mercadoPagoService.createCheckout(requestDTO));
 
         // Then
         assertEquals(PaymentStatus.PENDING, payment.getStatus());
@@ -877,7 +882,7 @@ public class MercadoPagoServiceTest
         when(responseSpec.body(MercadoPagoOrderResponseDTO.class)).thenReturn(responseDTO);
 
         // When
-        assertThrows(IllegalStateException.class, () -> mercadoPagoService.createCheckout(requestDTO));
+        assertThrows(PaymentProviderDataMismatchException.class, () -> mercadoPagoService.createCheckout(requestDTO));
 
         // Then
         assertEquals(PaymentStatus.PENDING, payment.getStatus());

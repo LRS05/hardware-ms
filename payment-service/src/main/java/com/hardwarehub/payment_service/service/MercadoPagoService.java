@@ -1,5 +1,12 @@
 package com.hardwarehub.payment_service.service;
 
+import com.hardwarehub.payment_service.exception.InvalidPaymentRequestException;
+import com.hardwarehub.payment_service.exception.InvalidPaymentStateException;
+import com.hardwarehub.payment_service.exception.PaymentAlreadyCompletedException;
+import com.hardwarehub.payment_service.exception.PaymentAttemptNotFoundException;
+import com.hardwarehub.payment_service.exception.PaymentProviderDataMismatchException;
+import com.hardwarehub.payment_service.exception.PaymentProviderIntegrationException;
+
 import com.hardwarehub.payment_service.client.OrderClient;
 import com.hardwarehub.payment_service.dto.*;
 import com.hardwarehub.payment_service.entity.MercadoPagoPaymentEntity;
@@ -26,7 +33,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-public class MercadoPagoService
+public class MercadoPagoService implements PaymentServiceProvider
 {
     private final MercadoPagoRepository mercadoPagoRepository;
     private final PaymentRepository paymentRepository;
@@ -62,17 +69,18 @@ public class MercadoPagoService
                 .build();
     }
 
+    @Override
     public PaymentLinkResponseDTO createCheckout(PaymentRequestDTO requestDTO)
     {
         if (requestDTO.provider() != PaymentProvider.MERCADO_PAGO
                 || requestDTO.amount() == null || requestDTO.amount().signum() <= 0)
         {
-            throw new IllegalArgumentException("Invalid payment request.");
+            throw new InvalidPaymentRequestException("Invalid payment request.");
         }
 
         if (paymentRepository.existsByOrderId(requestDTO.orderId()))
         {
-            throw new IllegalStateException("The order has already been paid.");
+            throw new PaymentAlreadyCompletedException("The order has already been paid.");
         }
 
         BigDecimal amount = requestDTO.amount().setScale(2, RoundingMode.UNNECESSARY);
@@ -83,7 +91,7 @@ public class MercadoPagoService
 
         if (payment.getAmount().compareTo(amount) != 0)
         {
-            throw new IllegalStateException("Pending payment amount does not match the requested amount.");
+            throw new InvalidPaymentStateException("Pending payment amount does not match the requested amount.");
         }
 
         if (payment.getCheckoutUrl() != null)
@@ -99,7 +107,7 @@ public class MercadoPagoService
 
             if (existingOrder.status() != MercadoPagoOrderStatus.CANCELED)
             {
-                throw new IllegalStateException("The existing Mercado Pago checkout cannot be reused or replaced.");
+                throw new InvalidPaymentStateException("The existing Mercado Pago checkout cannot be reused or replaced.");
             }
 
             payment.setStatus(PaymentStatus.CANCELLED);
@@ -126,7 +134,7 @@ public class MercadoPagoService
         if (response == null || response.id() == null || response.id().isBlank()
                 || response.checkoutUrl() == null || response.checkoutUrl().isBlank())
         {
-            throw new IllegalStateException("Mercado Pago returned an incomplete order.");
+            throw new PaymentProviderIntegrationException("Mercado Pago returned an incomplete order.");
         }
 
         payment.setProviderOrderId(response.id());
@@ -136,11 +144,12 @@ public class MercadoPagoService
         return new PaymentLinkResponseDTO(response.checkoutUrl());
     }
 
+    @Override
     public void cancelCheckout(int orderId)
     {
         if (paymentRepository.existsByOrderId(orderId))
         {
-            throw new IllegalStateException("A completed payment cannot be canceled as a checkout.");
+            throw new PaymentAlreadyCompletedException("A completed payment cannot be canceled as a checkout.");
         }
 
         List<MercadoPagoPaymentEntity> attempts = mercadoPagoRepository.findAllByOrderIdOrderByCreatedAtDesc(orderId);
@@ -155,7 +164,7 @@ public class MercadoPagoService
             if (payment.getStatus() != PaymentStatus.PENDING
                     || payment.getProviderOrderId() == null)
             {
-                throw new IllegalStateException("The payment attempt cannot be safely canceled.");
+                throw new InvalidPaymentStateException("The payment attempt cannot be safely canceled.");
             }
         }
 
@@ -179,7 +188,7 @@ public class MercadoPagoService
             if (responseDTO == null || !payment.getProviderOrderId().equals(responseDTO.id())
                     || responseDTO.status() != MercadoPagoOrderStatus.CANCELED)
             {
-                throw new IllegalStateException("Mercado Pago did not confirm the cancellation.");
+                throw new PaymentProviderIntegrationException("Mercado Pago did not confirm the cancellation.");
             }
 
             payment.setStatus(PaymentStatus.CANCELLED);
@@ -218,6 +227,12 @@ public class MercadoPagoService
         }
     }
 
+    @Override
+    public PaymentProvider getProvider()
+    {
+        return PaymentProvider.MERCADO_PAGO;
+    }
+
     private MercadoPagoOrderResponseDTO fetchMercadoPagoOrderById(String providerOrderId)
     {
         MercadoPagoOrderResponseDTO responseDTO = restClient.get()
@@ -227,7 +242,7 @@ public class MercadoPagoService
 
         if (responseDTO == null || !providerOrderId.equals(responseDTO.id()))
         {
-            throw new IllegalStateException("Mercado Pago returned an invalid order.");
+            throw new PaymentProviderIntegrationException("Mercado Pago returned an invalid order.");
         }
 
         return responseDTO;
@@ -278,18 +293,18 @@ public class MercadoPagoService
 
         if (!expectedReference.equals(responseDTO.externalReference()))
         {
-            throw new IllegalStateException("Mercado Pago order reference does not match the payment attempt.");
+            throw new PaymentProviderDataMismatchException("Mercado Pago order reference does not match the payment attempt.");
         }
 
         if (!paymentEntity.getCurrency().equals(responseDTO.currency()))
         {
-            throw new IllegalStateException("Mercado Pago order currency does not match the payment attempt.");
+            throw new PaymentProviderDataMismatchException("Mercado Pago order currency does not match the payment attempt.");
         }
 
         if (responseDTO.totalAmount() == null
                 || paymentEntity.getAmount().compareTo(responseDTO.totalAmount()) != 0)
         {
-            throw new IllegalStateException("Mercado Pago order amount does not match the payment attempt.");
+            throw new PaymentProviderDataMismatchException("Mercado Pago order amount does not match the payment attempt.");
         }
     }
 
@@ -301,14 +316,14 @@ public class MercadoPagoService
         if (responseDTO.totalPaidAmount() == null
                 || paymentEntity.getAmount().compareTo(responseDTO.totalPaidAmount()) != 0)
         {
-            throw new IllegalStateException("Mercado Pago paid amount does not match the payment attempt.");
+            throw new PaymentProviderDataMismatchException("Mercado Pago paid amount does not match the payment attempt.");
         }
     }
 
     private MercadoPagoPaymentEntity findByProviderOrderIdOrThrow(String providerOrderId)
     {
         return mercadoPagoRepository.findByProviderOrderId(providerOrderId)
-                .orElseThrow(() -> new IllegalStateException("Mercado Pago order not found."));
+                .orElseThrow(() -> new PaymentAttemptNotFoundException("Payment attempt not found."));
     }
 
     private boolean isPaymentAccredited(MercadoPagoOrderResponseDTO responseDTO)
