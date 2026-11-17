@@ -1,6 +1,6 @@
 # Hardware - Microservices API
 
-A hardware store REST API built with Java, Spring Boot and Spring Cloud. Includes user, product, order and payment services, an API Gateway, service discovery and centralized configuration.
+A hardware store REST API built with Java, Spring Boot and Spring Cloud. Covers authentication, product management and the purchase flow, including stock reservation, Mercado Pago payments and automatic order expiration. Uses an API Gateway, service discovery and centralized configuration.
 
 ## Features
 
@@ -10,14 +10,15 @@ A hardware store REST API built with Java, Spring Boot and Spring Cloud. Include
 - Administrative user management and role updates.
 - Public product catalog with pagination and search by name or category.
 - Product creation, updates, deactivation and stock management.
-- Customer orders with item management, price refresh, checkout and reopening.
-- Stock reservation during checkout and release when reopening an order.
+- Customer orders with item management, price refresh, checkout, reopening and cancellation.
+- Automatic expiration of pending orders.
+- Stock reservation during checkout and idempotent release when reopening, canceling or expiring an order.
 - Mercado Pago checkout and signed webhooks for recording approved payments and completing orders.
 - Internal service authentication using API keys and permissions.
 - Database migrations with Flyway.
 - Row locking for concurrent stock and order updates.
 - Controlled responses for product dependency errors and connection timeouts.
-- Docker Compose environment with PostgreSQL and the seven applications.
+- Docker Compose setup for all services and PostgreSQL.
 - Unit and integration tests with JUnit, Mockito, RestTestClient and Testcontainers.
 - Automated builds, tests and Docker image builds on pushes and pull requests with GitHub Actions.
 
@@ -42,7 +43,7 @@ A hardware store REST API built with Java, Spring Boot and Spring Cloud. Include
 - JUnit, Mockito and MockRestServiceServer
 - RestTestClient and Testcontainers
 
-GitHub Actions runs `mvn clean verify` and builds Docker images on pushes and pull requests. It does not deploy services or run the distributed demo.
+GitHub Actions runs `mvn clean verify` and builds Docker images on pushes and pull requests. Pushes to `main` also publish the seven application images to Docker Hub.
 
 ## Microservices
 
@@ -101,7 +102,7 @@ Each cookie uses its JWT's configured lifetime. For example, `JWT_ACCESS_EXPIRAT
 
 Product statuses: `ACTIVE`, `OUT_OF_STOCK` and `INACTIVE`. Visibility differs between public and administrative endpoints.
 
-Customer and catalog pagination uses zero-based `page`, default `size=20` and maximum `size=100`.
+Pagination uses zero-based `page`. Products default to `size=20`, with a maximum of 100. Users default to `size=20`, with a maximum of 50. Orders default to `size=10`, with a maximum of 50.
 
 ### Customer Orders
 
@@ -119,9 +120,12 @@ Customer and catalog pagination uses zero-based `page`, default `size=20` and ma
 | PATCH | `/api/v1/orders/active/clear` | Clear the active order |
 | PATCH | `/api/v1/orders/active/checkout` | Reserve stock and move the order to PENDING |
 | PATCH | `/api/v1/orders/pending/reopen` | Release reserved stock and return the order to ACTIVE |
+| PATCH | `/api/v1/orders/pending/cancel` | Cancel the pending order and release reserved stock |
 | POST | `/api/v1/orders/pending/payments/checkout` | Create or reuse a Mercado Pago checkout for the pending order |
 
-Available flows: `ACTIVE` → checkout → `PENDING` → reopen → `ACTIVE`, or `PENDING` → accredited Mercado Pago payment → `COMPLETED`. Reopening cancels any unpaid payment checkout before releasing stock. A processed payment cannot be canceled through reopening. Public order cancellation and expiration remain pending.
+Orders move from `ACTIVE` to `PENDING` at checkout. A pending order can be reopened as `ACTIVE`, canceled as `CANCELED`, or completed as `COMPLETED` after an accredited payment.
+
+Pending orders have a 15-minute payment deadline. A scheduler checks up to 100 expired orders per run, with a 30-second delay between runs. Reopening, cancellation and expiration cancel any unpaid checkout before releasing stock.
 
 ### Mercado Pago
 
@@ -209,7 +213,7 @@ From the repository root, copy the environment template:
 cp .env.example .env
 ```
 
-Replace the fictitious credentials in `.env` before starting. Do not commit this file.
+Replace the fictitious credentials in `.env` before starting.
 
 Keep these URLs for the Compose environment:
 
