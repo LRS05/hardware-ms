@@ -47,3 +47,4 @@ internal:
 
 orders:
   payment-timeout-minutes: 15
+  expiration-check-delay-ms: 30000
