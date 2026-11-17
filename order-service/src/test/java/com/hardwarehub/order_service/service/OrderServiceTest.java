@@ -28,12 +28,17 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -527,7 +532,7 @@ public class OrderServiceTest
         assertEquals(BigDecimal.valueOf(3000), item.getPrice());
         assertEquals(BigDecimal.valueOf(3000), order.getTotalPrice());
 
-        verify(productClient).reserveStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(item.getProductId(), 2))));
+        verify(productClient).reserveStock(new StockReservationRequestDTO(order.getId(), order.getExpiresAt(), List.of(new ItemReservationDTO(item.getProductId(), 2))));
         verify(orderRepository).save(order);
         verify(orderMapper).entityToDTO(order);
     }
@@ -549,7 +554,7 @@ public class OrderServiceTest
 
         orderService.checkout(userId);
 
-        verify(productClient).reserveStock(new StockReservationRequestDTO(List.of(
+        verify(productClient).reserveStock(new StockReservationRequestDTO(order.getId(), order.getExpiresAt(), List.of(
                 new ItemReservationDTO(1, 2),
                 new ItemReservationDTO(2, 3)
         )));
@@ -628,14 +633,15 @@ public class OrderServiceTest
 
         when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.ACTIVE.name())).thenReturn(Optional.of(order));
         when(productClient.getById(1)).thenReturn(product);
-        doThrow(new ProductOutOfStockException("Insufficient stock.")).when(productClient).reserveStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
+        doThrow(new ProductOutOfStockException("Insufficient stock.")).when(productClient).reserveStock(argThat(request ->
+                request.orderId() == order.getId()
+                        && request.expiresAt() != null
+                        && request.items().equals(List.of(new ItemReservationDTO(1, 2)))));
 
         // When
         assertThrows(ProductOutOfStockException.class, () -> orderService.checkout(userId));
 
         // Then
-        assertEquals(OrderStatus.ACTIVE, order.getStatus());
-
         verify(orderRepository, never()).save(any(OrderEntity.class));
         verifyNoInteractions(orderMapper);
     }
@@ -663,6 +669,136 @@ public class OrderServiceTest
     }
 
     @Test
+    void expire_whenOrderIsExpired_thenCancelAndReleaseStockOnceKeepingItems()
+    {
+        // Given
+        OrderEntity order = OrderFactory.activeOrder();
+        order.setStatus(OrderStatus.PENDING);
+        Instant expiresAt = Instant.now().minusSeconds(60);
+        order.setExpiresAt(expiresAt);
+        List<OrderItemEntity> items = List.copyOf(order.getOrderItems());
+        BigDecimal totalPrice = order.getTotalPrice();
+
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        // When
+        orderService.expire(order.getId());
+        orderService.expire(order.getId());
+
+        // Then
+        assertEquals(OrderStatus.CANCELED, order.getStatus());
+        assertNull(order.getExpiresAt());
+        assertEquals(items, order.getOrderItems());
+        assertEquals(totalPrice, order.getTotalPrice());
+
+        var calls = inOrder(paymentClient, productClient);
+        calls.verify(paymentClient).cancelCheckout(order.getId());
+        calls.verify(productClient).releaseStock(
+                new StockReservationRequestDTO(order.getId(), expiresAt, List.of(new ItemReservationDTO(1, 2)))
+        );
+        verifyNoMoreInteractions(paymentClient, productClient);
+        verify(orderRepository, never()).save(any(OrderEntity.class));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = OrderStatus.class, names = {"ACTIVE", "COMPLETED", "CANCELED"})
+    void expire_whenOrderIsNotPending_thenDoNothing(OrderStatus status)
+    {
+        // Given
+        OrderEntity order = OrderFactory.activeOrder();
+        order.setStatus(status);
+
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        // When
+        orderService.expire(order.getId());
+
+        // Then
+        assertEquals(status, order.getStatus());
+        verifyNoInteractions(paymentClient, productClient);
+    }
+
+    @Test
+    void expire_whenDeadlineIsInTheFuture_thenDoNothing()
+    {
+        // Given
+        OrderEntity order = OrderFactory.activeOrder();
+        order.setStatus(OrderStatus.PENDING);
+        Instant expiresAt = Instant.now().plusSeconds(3600);
+        order.setExpiresAt(expiresAt);
+
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        // When
+        orderService.expire(order.getId());
+
+        // Then
+        assertEquals(OrderStatus.PENDING, order.getStatus());
+        assertEquals(expiresAt, order.getExpiresAt());
+        verifyNoInteractions(paymentClient, productClient);
+    }
+
+    @Test
+    void expire_whenOrderDoesNotExist_thenThrowOrderNotFoundException()
+    {
+        // Given
+        when(orderRepository.findByIdForUpdate(25)).thenReturn(Optional.empty());
+
+        // When
+        assertThrows(OrderNotFoundException.class, () -> orderService.expire(25));
+
+        // Then
+        verifyNoInteractions(paymentClient, productClient);
+    }
+
+    @Test
+    void expire_whenPaymentCancellationIsRejected_thenDoNotReleaseStock()
+    {
+        // Given
+        OrderEntity order = OrderFactory.activeOrder();
+        order.setStatus(OrderStatus.PENDING);
+        Instant expiresAt = Instant.now().minusSeconds(60);
+        order.setExpiresAt(expiresAt);
+
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+        doThrow(new HttpClientErrorException(HttpStatus.CONFLICT))
+                .when(paymentClient).cancelCheckout(order.getId());
+
+        // When
+        assertThrows(HttpClientErrorException.class, () -> orderService.expire(order.getId()));
+
+        // Then
+        assertEquals(OrderStatus.PENDING, order.getStatus());
+        assertEquals(expiresAt, order.getExpiresAt());
+        verifyNoInteractions(productClient);
+    }
+
+    @Test
+    void expire_whenStockReleaseFails_thenPropagateExceptionWithoutCancelingOrder()
+    {
+        // Given
+        OrderEntity order = OrderFactory.activeOrder();
+        order.setStatus(OrderStatus.PENDING);
+        Instant expiresAt = Instant.now().minusSeconds(60);
+        order.setExpiresAt(expiresAt);
+        StockReservationRequestDTO request = new StockReservationRequestDTO(order.getId(), expiresAt,
+                List.of(new ItemReservationDTO(1, 2))
+        );
+
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+        doThrow(new ProductNotFoundException("Product not found."))
+                .when(productClient).releaseStock(request);
+
+        // When
+        assertThrows(ProductNotFoundException.class, () -> orderService.expire(order.getId()));
+
+        // Then
+        assertEquals(OrderStatus.PENDING, order.getStatus());
+        assertEquals(expiresAt, order.getExpiresAt());
+        verify(paymentClient).cancelCheckout(order.getId());
+    }
+
+    @Test
     void reopen_whenPendingOrderExists_thenReleaseStockAndReturnActiveOrder()
     {
         // Given
@@ -670,6 +806,8 @@ public class OrderServiceTest
 
         OrderEntity order = OrderFactory.activeOrder();
         order.setStatus(OrderStatus.PENDING);
+        Instant expiresAt = Instant.parse("2026-11-17T15:30:00Z");
+        order.setExpiresAt(expiresAt);
 
         OrderResponseDTO orderDTO = OrderFactory.activeOrderDTO();
 
@@ -684,7 +822,7 @@ public class OrderServiceTest
         assertEquals(orderDTO, result);
         assertEquals(OrderStatus.ACTIVE, order.getStatus());
 
-        verify(productClient).releaseStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
+        verify(productClient).releaseStock(new StockReservationRequestDTO(order.getId(), expiresAt, List.of(new ItemReservationDTO(1, 2))));
         verify(orderRepository).save(order);
     }
 
@@ -696,9 +834,11 @@ public class OrderServiceTest
 
         OrderEntity order = OrderFactory.activeOrder();
         order.setStatus(OrderStatus.PENDING);
+        Instant expiresAt = Instant.parse("2026-11-17T15:30:00Z");
+        order.setExpiresAt(expiresAt);
 
         when(orderRepository.findByUserIdAndStatusForUpdate(userId, OrderStatus.PENDING.name())).thenReturn(Optional.of(order));
-        doThrow(new ProductNotFoundException("Product not found.")).when(productClient).releaseStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
+        doThrow(new ProductNotFoundException("Product not found.")).when(productClient).releaseStock(new StockReservationRequestDTO(order.getId(), expiresAt, List.of(new ItemReservationDTO(1, 2))));
 
         // When
         assertThrows(ProductNotFoundException.class, () -> orderService.reopen(userId));

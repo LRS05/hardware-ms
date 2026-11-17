@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.http.HttpConnectTimeoutException;
+import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -53,7 +54,7 @@ public class ProductClientTest
     @Test
     void reserveStock_whenProductServiceReturnsNoContent_thenSendEntireBatch()
     {
-        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(List.of(
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(
                 new ItemReservationDTO(1, 2),
                 new ItemReservationDTO(2, 3)
         ));
@@ -61,7 +62,7 @@ public class ProductClientTest
         server.expect(requestTo("http://product-service/internal/products/reserve"))
                 .andExpect(method(HttpMethod.PATCH))
                 .andExpect(header("X-API-Key", apiKey))
-                .andExpect(content().json("{\"items\":[{\"productId\":1,\"quantity\":2},{\"productId\":2,\"quantity\":3}]}"))
+                .andExpect(content().json("{\"orderId\":25,\"expiresAt\":\"2026-11-17T15:30:00Z\",\"items\":[{\"productId\":1,\"quantity\":2},{\"productId\":2,\"quantity\":3}]}"))
                 .andRespond(withNoContent());
 
         productClient.reserveStock(requestDTO);
@@ -72,7 +73,7 @@ public class ProductClientTest
     @Test
     void reserveStock_whenProductServiceReturnsConflict_thenThrowProductOutOfStockException()
     {
-        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2)));
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(new ItemReservationDTO(1, 2)));
 
         server.expect(requestTo("http://product-service/internal/products/reserve"))
                 .andExpect(method(HttpMethod.PATCH))
@@ -86,7 +87,7 @@ public class ProductClientTest
     @Test
     void reserveStock_whenProductServiceReturnsNotFound_thenThrowProductNotFoundException()
     {
-        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2)));
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(new ItemReservationDTO(1, 2)));
 
         server.expect(requestTo("http://product-service/internal/products/reserve"))
                 .andExpect(method(HttpMethod.PATCH))
@@ -100,7 +101,7 @@ public class ProductClientTest
     @Test
     void reserveStock_whenProductServiceReadTimesOut_thenThrowProductTimeoutExceptionWithoutRetrying()
     {
-        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2)));
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(new ItemReservationDTO(1, 2)));
 
         server.expect(requestTo("http://product-service/internal/products/reserve"))
                 .andExpect(method(HttpMethod.PATCH))

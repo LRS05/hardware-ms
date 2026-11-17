@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -41,4 +43,13 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Integer>
             nativeQuery = true
     )
     Optional<OrderEntity> findByIdForUpdate(@Param("id") int id);
+
+    @Query("""
+        SELECT o.id
+        FROM OrderEntity o
+        WHERE o.status = :status
+        AND o.expiresAt <= :now
+        ORDER BY o.expiresAt, o.id
+        """)
+    List<Integer> findExpiredOrderIds(@Param("status") OrderStatus status, @Param("now") Instant now, Pageable pageable);
 }

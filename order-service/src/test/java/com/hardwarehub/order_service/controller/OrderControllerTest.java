@@ -689,7 +689,10 @@ public class OrderControllerTest
     @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
     void checkout_whenStockReservationFails_thenReturnConflict()
     {
-        doThrow(new ProductOutOfStockException("Insufficient stock.")).when(productClient).reserveStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
+        doThrow(new ProductOutOfStockException("Insufficient stock.")).when(productClient).reserveStock(argThat(request ->
+                request.orderId() == 2
+                        && request.expiresAt() != null
+                        && request.items().equals(List.of(new ItemReservationDTO(1, 2)))));
 
         customerRestTestClient.patch()
                 .uri("/active/checkout")

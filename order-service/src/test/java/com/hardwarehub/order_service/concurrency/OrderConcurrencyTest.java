@@ -477,7 +477,7 @@ public class OrderConcurrencyTest
         assertEquals(OrderStatus.PENDING, updatedOrder.getStatus());
         assertEquals(new BigDecimal("2000.00"), updatedOrder.getTotalPrice());
         assertEquals(2, updatedItem.getQuantity());
-        verify(productClient, times(1)).reserveStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
+        verify(productClient, times(1)).reserveStock(new StockReservationRequestDTO(updatedOrder.getId(), updatedOrder.getExpiresAt(), List.of(new ItemReservationDTO(1, 2))));
         verify(productClient, never()).releaseStock(any(StockReservationRequestDTO.class));
     }
 
@@ -488,6 +488,8 @@ public class OrderConcurrencyTest
 
         OrderEntity order = orderRepository.findById(orderId).orElseThrow();
         order.setStatus(OrderStatus.PENDING);
+        Instant expiresAt = Instant.parse("2026-11-17T15:30:00Z");
+        order.setExpiresAt(expiresAt);
         orderRepository.saveAndFlush(order);
 
         CountDownLatch ready = new CountDownLatch(2);
@@ -538,7 +540,7 @@ public class OrderConcurrencyTest
         assertEquals(OrderStatus.ACTIVE, updatedOrder.getStatus());
         assertEquals(new BigDecimal("2000.00"), updatedOrder.getTotalPrice());
         assertEquals(2, updatedItem.getQuantity());
-        verify(productClient, times(1)).releaseStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
+        verify(productClient, times(1)).releaseStock(new StockReservationRequestDTO(orderId, expiresAt, List.of(new ItemReservationDTO(1, 2))));
         verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
     }
 
@@ -591,6 +593,8 @@ public class OrderConcurrencyTest
 
         OrderEntity order = orderRepository.findById(orderId).orElseThrow();
         order.setStatus(OrderStatus.PENDING);
+        Instant expiresAt = Instant.parse("2026-11-17T15:30:00Z");
+        order.setExpiresAt(expiresAt);
         orderRepository.saveAndFlush(order);
 
         CountDownLatch ready = new CountDownLatch(2);
@@ -645,7 +649,7 @@ public class OrderConcurrencyTest
         {
             assertEquals(200, reopenStatus);
             assertEquals(OrderStatus.ACTIVE, updatedOrder.getStatus());
-            verify(productClient, times(1)).releaseStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
+            verify(productClient, times(1)).releaseStock(new StockReservationRequestDTO(orderId, expiresAt, List.of(new ItemReservationDTO(1, 2))));
         }
 
         verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
@@ -917,8 +921,8 @@ public class OrderConcurrencyTest
         assertEquals(OrderStatus.PENDING, updatedOrder.getStatus());
         assertEquals(3, updatedItem.getQuantity());
         assertEquals(new BigDecimal("3000.00"), updatedOrder.getTotalPrice());
-        verify(productClient, times(1)).reserveStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 3))));
-        verify(productClient, never()).reserveStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
+        verify(productClient, times(1)).reserveStock(new StockReservationRequestDTO(updatedOrder.getId(), updatedOrder.getExpiresAt(), List.of(new ItemReservationDTO(1, 3))));
+        verify(productClient, never()).reserveStock(new StockReservationRequestDTO(updatedOrder.getId(), updatedOrder.getExpiresAt(), List.of(new ItemReservationDTO(1, 2))));
         verify(productClient, never()).releaseStock(any(StockReservationRequestDTO.class));
     }
 
@@ -930,6 +934,8 @@ public class OrderConcurrencyTest
 
         OrderEntity order = orderRepository.findById(orderId).orElseThrow();
         order.setStatus(OrderStatus.PENDING);
+        Instant expiresAt = Instant.parse("2026-11-17T15:30:00Z");
+        order.setExpiresAt(expiresAt);
         orderRepository.saveAndFlush(order);
 
         transaction = transactionManager.getTransaction(new DefaultTransactionDefinition());
@@ -963,8 +969,8 @@ public class OrderConcurrencyTest
         assertEquals(OrderStatus.ACTIVE, updatedOrder.getStatus());
         assertEquals(3, updatedItem.getQuantity());
         assertEquals(new BigDecimal("3000.00"), updatedOrder.getTotalPrice());
-        verify(productClient, times(1)).releaseStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 3))));
-        verify(productClient, never()).releaseStock(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))));
+        verify(productClient, times(1)).releaseStock(new StockReservationRequestDTO(orderId, expiresAt, List.of(new ItemReservationDTO(1, 3))));
+        verify(productClient, never()).releaseStock(new StockReservationRequestDTO(orderId, expiresAt, List.of(new ItemReservationDTO(1, 2))));
         verify(productClient, never()).reserveStock(any(StockReservationRequestDTO.class));
     }
 

@@ -20,6 +20,7 @@ import com.hardwarehub.order_service.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -56,9 +58,9 @@ public class OrderService
 
         validateOrderIsNotEmpty(order);
 
-        reserveProductStock(order);
-
         updateStatus(order, OrderStatus.PENDING);
+
+        reserveProductStock(order);
 
         return orderMapper.entityToDTO(orderRepository.save(order));
     }
@@ -144,6 +146,31 @@ public class OrderService
         releaseProductStock(order);
 
         updateStatus(order, OrderStatus.CANCELED);
+    }
+
+    @Transactional
+    public void expire(int orderId)
+    {
+        OrderEntity order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found."));
+
+        if (order.getStatus() != OrderStatus.PENDING
+                || order.getExpiresAt().isAfter(Instant.now()))
+        {
+            return;
+        }
+
+        paymentClient.cancelCheckout(orderId);
+
+        releaseProductStock(order);
+
+        updateStatus(order, OrderStatus.CANCELED);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Integer> findExpiredOrderIds()
+    {
+        return orderRepository.findExpiredOrderIds(OrderStatus.PENDING, Instant.now(), PageRequest.of(0, 100));
     }
 
     // Return an empty order without persisting it if the user has no active order.
@@ -323,7 +350,7 @@ public class OrderService
                 .map(item -> new ItemReservationDTO(item.getProductId(), item.getQuantity()))
                 .toList();
 
-        productClient.reserveStock(new StockReservationRequestDTO(items));
+        productClient.reserveStock(new StockReservationRequestDTO(order.getId(), order.getExpiresAt(), items));
     }
 
     private void releaseProductStock(OrderEntity order)
@@ -332,7 +359,7 @@ public class OrderService
                 .map(item -> new ItemReservationDTO(item.getProductId(), item.getQuantity()))
                 .toList();
 
-        productClient.releaseStock(new StockReservationRequestDTO(items));
+        productClient.releaseStock(new StockReservationRequestDTO(order.getId(), order.getExpiresAt(), items));
     }
 
     private OrderEntity findPendingOrderOrThrow(int userId)
@@ -392,7 +419,9 @@ public class OrderService
 
         if (status == OrderStatus.PENDING)
         {
-            order.setExpiresAt(Instant.now().plus(Duration.ofMinutes(paymentTimeoutMinutes)));
+            order.setExpiresAt(
+                    Instant.now().plus(Duration.ofMinutes(paymentTimeoutMinutes)).truncatedTo(ChronoUnit.MICROS)
+            );
         }
         else
         {
