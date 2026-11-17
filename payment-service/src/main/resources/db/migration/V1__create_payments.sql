@@ -16,7 +16,7 @@ CREATE TABLE mercado_pago_payments (
     amount NUMERIC(10, 2) NOT NULL,
     currency VARCHAR(3) NOT NULL,
     status VARCHAR(255) NOT NULL,
-    mercado_pago_order_id VARCHAR(100) UNIQUE,
+    provider_order_id VARCHAR(100) UNIQUE,
     checkout_url TEXT,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP(6) NOT NULL
