@@ -467,7 +467,9 @@ public class OrderConcurrencyTest
         List<Integer> statuses = new ArrayList<>(List.of(firstStatus, secondStatus));
         Collections.sort(statuses);
 
-        assertEquals(List.of(200, 409), statuses);
+        assertEquals(200, statuses.get(0));
+        // The losing request may find a pending order or no active order after waiting for the lock.
+        assertTrue(statuses.get(1) == 400 || statuses.get(1) == 409);
 
         OrderEntity updatedOrder = orderRepository.findById(orderId).orElseThrow();
         OrderItemEntity updatedItem = orderItemRepository.findById(2).orElseThrow();
