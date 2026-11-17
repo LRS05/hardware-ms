@@ -8,5 +8,15 @@ CREATE TABLE products (
     price DECIMAL(10, 2) NOT NULL,
     stock INTEGER NOT NULL,
     created_at TIMESTAMP(6) NOT NULL,
-    updated_at TIMESTAMP(6) NOT NULL
+    updated_at TIMESTAMP(6) NOT NULL,
+
+    CONSTRAINT ck_products_stock_nonnegative
+        CHECK (stock >= 0)
+);
+
+CREATE TABLE stock_releases (
+    order_id INTEGER NOT NULL,
+    expires_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
+
+    PRIMARY KEY (order_id, expires_at)
 );

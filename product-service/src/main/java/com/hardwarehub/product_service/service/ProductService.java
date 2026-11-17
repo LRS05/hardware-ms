@@ -134,6 +134,11 @@ public class ProductService
     @Transactional
     public void releaseStock(StockReservationRequestDTO requestDTO)
     {
+        if (isStockAlreadyReleased(requestDTO))
+        {
+            return;
+        }
+
         List<ItemReservationDTO> items = requestDTO.items().stream()
                 .sorted(Comparator.comparing(ItemReservationDTO::productId))
                 .toList();
@@ -298,5 +303,13 @@ public class ProductService
         {
             product.setStatus(ProductStatus.ACTIVE);
         }
+    }
+
+    private boolean isStockAlreadyReleased(StockReservationRequestDTO requestDTO)
+    {
+        return productRepository.registerStockRelease(
+                requestDTO.orderId(),
+                requestDTO.expiresAt()
+        ) == 0;
     }
 }

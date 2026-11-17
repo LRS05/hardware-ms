@@ -3,6 +3,8 @@ package com.hardwarehub.product_service.concurrency;
 import com.hardwarehub.product_service.config.PostgresTestConfig;
 import com.hardwarehub.product_service.dto.ProductUpdateRequestDTO;
 import com.hardwarehub.product_service.dto.StockRequestDTO;
+import com.hardwarehub.product_service.dto.StockReservationRequestDTO;
+import com.hardwarehub.product_service.dto.ItemReservationDTO;
 import com.hardwarehub.product_service.entity.ProductEntity;
 import com.hardwarehub.product_service.enums.ProductStatus;
 import com.hardwarehub.product_service.repository.ProductRepository;
@@ -48,7 +50,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @AutoConfigureRestTestClient
 @ActiveProfiles("test")
 @Import(PostgresTestConfig.class)
-@Sql(statements = "DELETE FROM products")
+@Sql(statements = {"DELETE FROM stock_releases", "DELETE FROM products"})
 @Sql("/data.sql")
 @SpringBootTest(properties = "spring.config.location=classpath:/application-test.properties", webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class ProductConcurrencyTest
@@ -774,6 +776,77 @@ public class ProductConcurrencyTest
         ProductEntity updatedProduct = productRepository.findById(productId).orElseThrow();
         assertEquals(1, updatedProduct.getStock());
         assertEquals(ProductStatus.INACTIVE, updatedProduct.getStatus());
+    }
+
+    @Test
+    void releaseStock_whenConcurrentRequestsUseSameCheckout_thenRestoreStockOnce() throws Exception
+    {
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(
+                new ItemReservationDTO(1, 2)
+        ));
+
+        restTestClient.patch()
+                .uri("/reserve")
+                .body(requestDTO)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        transaction = transactionManager.getTransaction(new DefaultTransactionDefinition());
+        productRepository.findByIdForUpdate(1).orElseThrow();
+        int blockingPid = jdbcTemplate.queryForObject("SELECT pg_backend_pid()", Integer.class);
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        Future<Integer> firstRequest = executor.submit(() ->
+        {
+            ready.countDown();
+            assertTrue(start.await(10, TimeUnit.SECONDS));
+
+            return restTestClient.patch()
+                    .uri("/release")
+                    .body(requestDTO)
+                    .exchange()
+                    .expectBody()
+                    .returnResult()
+                    .getStatus()
+                    .value();
+        });
+
+        Future<Integer> secondRequest = executor.submit(() ->
+        {
+            ready.countDown();
+            assertTrue(start.await(10, TimeUnit.SECONDS));
+
+            return secondRestTestClient.patch()
+                    .uri("/release")
+                    .body(requestDTO)
+                    .exchange()
+                    .expectBody()
+                    .returnResult()
+                    .getStatus()
+                    .value();
+        });
+
+        assertTrue(ready.await(10, TimeUnit.SECONDS));
+        start.countDown();
+
+        waitUntilProductIsBlocked(blockingPid);
+        await().atMost(10, TimeUnit.SECONDS).until(() -> jdbcTemplate.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM pg_stat_activity " +
+                        "WHERE query ILIKE '%INSERT INTO stock_releases%' " +
+                        "AND cardinality(pg_blocking_pids(pid)) > 0)",
+                Boolean.class
+        ));
+        assertFalse(firstRequest.isDone());
+        assertFalse(secondRequest.isDone());
+
+        transactionManager.commit(transaction);
+
+        assertEquals(204, firstRequest.get(15, TimeUnit.SECONDS));
+        assertEquals(204, secondRequest.get(15, TimeUnit.SECONDS));
+        assertEquals(50, productRepository.findById(1).orElseThrow().getStock());
+        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM stock_releases", Integer.class));
     }
 
     private void waitUntilProductIsBlocked(int blockingPid)

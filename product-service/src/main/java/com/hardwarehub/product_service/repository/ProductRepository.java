@@ -6,10 +6,12 @@ import com.hardwarehub.product_service.enums.ProductStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.Optional;
 
 @Repository
@@ -36,4 +38,13 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Integer>
     boolean existsByNameAndIdNot(String name, int id);
 
     boolean existsBySkuAndIdNot(String sku, int id);
+
+    @Modifying
+    @Query(
+            value = "INSERT INTO stock_releases (order_id, expires_at) " +
+                    "VALUES (:orderId, :expiresAt) " +
+                    "ON CONFLICT (order_id, expires_at) DO NOTHING",
+            nativeQuery = true
+    )
+    int registerStockRelease(@Param("orderId") int orderId, @Param("expiresAt") Instant expiresAt);
 }

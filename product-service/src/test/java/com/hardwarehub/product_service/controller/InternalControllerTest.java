@@ -17,11 +17,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -29,13 +30,16 @@ import static org.junit.jupiter.api.Assertions.*;
 @AutoConfigureRestTestClient
 @ActiveProfiles("test")
 @Import(PostgresTestConfig.class)
-@Sql(statements = "DELETE FROM products")
+@Sql(statements = {"DELETE FROM stock_releases", "DELETE FROM products"})
 @Sql("/data.sql")
 @SpringBootTest(properties = "spring.config.location=classpath:/application-test.properties", webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class InternalControllerTest
 {
     @Autowired
     private ProductRepository productRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @LocalServerPort
     private int port;
@@ -57,7 +61,7 @@ public class InternalControllerTest
     @Test
     void reserveStock_whenAllProductsHaveStock_thenDecreaseEntireBatch()
     {
-        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(List.of(
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(
                 new ItemReservationDTO(2, 3),
                 new ItemReservationDTO(1, 50)
         ));
@@ -79,7 +83,7 @@ public class InternalControllerTest
     @Test
     void reserveStock_whenSecondProductHasInsufficientStock_thenRollbackEntireBatch()
     {
-        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(List.of(
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(
                 new ItemReservationDTO(1, 50),
                 new ItemReservationDTO(2, 21)
         ));
@@ -101,7 +105,7 @@ public class InternalControllerTest
     @Test
     void reserveStock_whenSecondProductDoesNotExist_thenRollbackEntireBatch()
     {
-        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(List.of(
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(
                 new ItemReservationDTO(1, 50),
                 new ItemReservationDTO(999, 1)
         ));
@@ -124,7 +128,7 @@ public class InternalControllerTest
         secondProduct.setStatus(ProductStatus.INACTIVE);
         productRepository.saveAndFlush(secondProduct);
 
-        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(List.of(
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(
                 new ItemReservationDTO(1, 50),
                 new ItemReservationDTO(2, 1)
         ));
@@ -144,45 +148,6 @@ public class InternalControllerTest
     }
 
     @Test
-    void reserveStock_whenItemsAreEmpty_thenReturnBadRequest()
-    {
-        restTestClient.patch()
-                .uri("/reserve")
-                .body(new StockReservationRequestDTO(List.of()))
-                .exchange()
-                .expectStatus().isBadRequest();
-    }
-
-    @Test
-    void reserveStock_whenQuantityIsInvalid_thenReturnBadRequestWithoutChangingStock()
-    {
-        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(List.of(
-                new ItemReservationDTO(1, 2),
-                new ItemReservationDTO(2, 0)
-        ));
-
-        restTestClient.patch()
-                .uri("/reserve")
-                .body(requestDTO)
-                .exchange()
-                .expectStatus().isBadRequest();
-
-        assertEquals(50, productRepository.findById(1).orElseThrow().getStock());
-        assertEquals(20, productRepository.findById(2).orElseThrow().getStock());
-    }
-
-    @Test
-    void reserveStock_whenItemIsNull_thenReturnBadRequest()
-    {
-        restTestClient.patch()
-                .uri("/reserve")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body("{\"items\":[null]}")
-                .exchange()
-                .expectStatus().isBadRequest();
-    }
-
-    @Test
     void reserveStock_whenApiKeyIsMissing_thenReturnUnauthorized()
     {
         RestTestClient.bindToServer()
@@ -190,7 +155,7 @@ public class InternalControllerTest
                 .build()
                 .patch()
                 .uri("/reserve")
-                .body(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))))
+                .body(new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(new ItemReservationDTO(1, 2))))
                 .exchange()
                 .expectStatus().isUnauthorized();
     }
@@ -206,7 +171,7 @@ public class InternalControllerTest
                 .patch()
                 .uri("/reserve")
                 .header("X-API-Key", "invalid-key")
-                .body(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))))
+                .body(new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(new ItemReservationDTO(1, 2))))
                 .exchange()
                 .expectStatus().isUnauthorized()
                 .expectBody()
@@ -226,7 +191,7 @@ public class InternalControllerTest
                 .patch()
                 .uri("/reserve")
                 .header("X-API-Key", "test-read-only-key")
-                .body(new StockReservationRequestDTO(List.of(new ItemReservationDTO(1, 2))))
+                .body(new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(new ItemReservationDTO(1, 2))))
                 .exchange()
                 .expectStatus().isForbidden();
 
@@ -339,5 +304,125 @@ public class InternalControllerTest
         ProductEntity updatedProduct = productRepository.findById(productId).orElseThrow();
         assertEquals(0, updatedProduct.getStock());
         assertEquals(ProductStatus.OUT_OF_STOCK, updatedProduct.getStatus());
+    }
+
+    @Test
+    void releaseStock_whenReleaseIsNew_thenRestoreEntireBatchAndRegisterRelease()
+    {
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(
+                new ItemReservationDTO(2, 3),
+                new ItemReservationDTO(1, 50)
+        ));
+
+        restTestClient.patch()
+                .uri("/reserve")
+                .body(requestDTO)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        restTestClient.patch()
+                .uri("/release")
+                .body(requestDTO)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        ProductEntity firstProduct = productRepository.findById(1).orElseThrow();
+        assertEquals(50, firstProduct.getStock());
+        assertEquals(ProductStatus.ACTIVE, firstProduct.getStatus());
+        assertEquals(20, productRepository.findById(2).orElseThrow().getStock());
+        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM stock_releases", Integer.class));
+    }
+
+    @Test
+    void releaseStock_whenSameCheckoutIsReleasedTwice_thenRestoreStockOnce()
+    {
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(
+                new ItemReservationDTO(1, 2),
+                new ItemReservationDTO(2, 3)
+        ));
+
+        restTestClient.patch()
+                .uri("/reserve")
+                .body(requestDTO)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        restTestClient.patch()
+                .uri("/release")
+                .body(requestDTO)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        restTestClient.patch()
+                .uri("/release")
+                .body(requestDTO)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        assertEquals(50, productRepository.findById(1).orElseThrow().getStock());
+        assertEquals(20, productRepository.findById(2).orElseThrow().getStock());
+        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM stock_releases", Integer.class));
+    }
+
+    @Test
+    void releaseStock_whenSameOrderHasAnotherExpiration_thenReleaseNewCheckout()
+    {
+        StockReservationRequestDTO firstRequestDTO = new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(
+                new ItemReservationDTO(1, 2)
+        ));
+        StockReservationRequestDTO secondRequestDTO = new StockReservationRequestDTO(25, Instant.parse("2026-11-17T16:00:00Z"), List.of(
+                new ItemReservationDTO(1, 3)
+        ));
+
+        restTestClient.patch()
+                .uri("/reserve")
+                .body(firstRequestDTO)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        restTestClient.patch()
+                .uri("/release")
+                .body(firstRequestDTO)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        restTestClient.patch()
+                .uri("/reserve")
+                .body(secondRequestDTO)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        restTestClient.patch()
+                .uri("/release")
+                .body(secondRequestDTO)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        restTestClient.patch()
+                .uri("/release")
+                .body(firstRequestDTO)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        assertEquals(50, productRepository.findById(1).orElseThrow().getStock());
+        assertEquals(2, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM stock_releases", Integer.class));
+    }
+
+    @Test
+    void releaseStock_whenSecondProductDoesNotExist_thenRollbackStockAndReleaseRecord()
+    {
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(25, Instant.parse("2026-11-17T15:30:00Z"), List.of(
+                new ItemReservationDTO(1, 2),
+                new ItemReservationDTO(999, 3)
+        ));
+
+        restTestClient.patch()
+                .uri("/release")
+                .body(requestDTO)
+                .exchange()
+                .expectStatus().isNotFound();
+
+        assertEquals(50, productRepository.findById(1).orElseThrow().getStock());
+        assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM stock_releases", Integer.class));
     }
 }

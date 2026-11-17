@@ -4,6 +4,8 @@ import com.hardwarehub.product_service.dto.ProductRequestDTO;
 import com.hardwarehub.product_service.dto.ProductResponseDTO;
 import com.hardwarehub.product_service.dto.ProductUpdateRequestDTO;
 import com.hardwarehub.product_service.dto.StockRequestDTO;
+import com.hardwarehub.product_service.dto.StockReservationRequestDTO;
+import com.hardwarehub.product_service.dto.ItemReservationDTO;
 import com.hardwarehub.product_service.entity.ProductEntity;
 import com.hardwarehub.product_service.enums.Category;
 import com.hardwarehub.product_service.enums.ProductStatus;
@@ -27,6 +29,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -1139,6 +1142,63 @@ public class ProductServiceTest
         assertEquals(0, product.getStock());
         assertEquals(ProductStatus.OUT_OF_STOCK, product.getStatus());
         verify(productRepository).findByIdForUpdate(id);
+        verifyNoMoreInteractions(productRepository);
+        verifyNoInteractions(productMapper);
+    }
+
+    @Test
+    void releaseStock_whenReleaseIsNew_thenRestoreStockForAllProducts()
+    {
+        // Given
+        int orderId = 25;
+        Instant expiresAt = Instant.parse("2026-11-17T15:30:00Z");
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(orderId, expiresAt, List.of(
+                new ItemReservationDTO(2, 3),
+                new ItemReservationDTO(1, 2)
+        ));
+        ProductEntity firstProduct = ProductFactory.graphicCard();
+        firstProduct.setStock(0);
+        firstProduct.setStatus(ProductStatus.OUT_OF_STOCK);
+        ProductEntity secondProduct = ProductFactory.processor();
+        secondProduct.setStatus(ProductStatus.INACTIVE);
+
+        when(productRepository.registerStockRelease(orderId, expiresAt)).thenReturn(1);
+        when(productRepository.findByIdForUpdate(1)).thenReturn(Optional.of(firstProduct));
+        when(productRepository.findByIdForUpdate(2)).thenReturn(Optional.of(secondProduct));
+
+        // When
+        productService.releaseStock(requestDTO);
+
+        // Then
+        assertEquals(2, firstProduct.getStock());
+        assertEquals(ProductStatus.ACTIVE, firstProduct.getStatus());
+        assertEquals(23, secondProduct.getStock());
+        assertEquals(ProductStatus.INACTIVE, secondProduct.getStatus());
+
+        verify(productRepository).registerStockRelease(orderId, expiresAt);
+        verify(productRepository).findByIdForUpdate(1);
+        verify(productRepository).findByIdForUpdate(2);
+        verifyNoMoreInteractions(productRepository);
+        verifyNoInteractions(productMapper);
+    }
+
+    @Test
+    void releaseStock_whenStockWasAlreadyReleased_thenDoNotModifyProducts()
+    {
+        // Given
+        int orderId = 25;
+        Instant expiresAt = Instant.parse("2026-11-17T15:30:00Z");
+        StockReservationRequestDTO requestDTO = new StockReservationRequestDTO(orderId, expiresAt, List.of(
+                new ItemReservationDTO(1, 2)
+        ));
+
+        when(productRepository.registerStockRelease(orderId, expiresAt)).thenReturn(0);
+
+        // When
+        productService.releaseStock(requestDTO);
+
+        // Then
+        verify(productRepository).registerStockRelease(orderId, expiresAt);
         verifyNoMoreInteractions(productRepository);
         verifyNoInteractions(productMapper);
     }
