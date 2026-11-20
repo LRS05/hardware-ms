@@ -25,8 +25,8 @@ A hardware store REST API built with Java, Spring Boot and Spring Cloud. Covers 
 ## Technologies Used
 
 - Java 17
-- Spring Boot 4.1.2
-- Spring Cloud 2025.1.3
+- Spring Boot 4.2.0
+- Spring Cloud 2026.0.0
 - Spring Cloud Gateway Server Web MVC
 - Spring Cloud Config
 - Netflix Eureka and Spring Cloud LoadBalancer
